@@ -497,4 +497,76 @@ class TestCLI < Minitest::Test
     # SARIF may omit "note" level since it's not the default, but let's be permissive
     assert_includes ["note", nil], result["level"]
   end
+
+  def test_brewfile_flag_loads_from_brewfile
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_from_brewfile_called = false
+    load_from_brewfile_mock = lambda do |path, include_deps:|
+      load_from_brewfile_called = true
+      assert_equal "/path/to/Brewfile", path
+      refute include_deps
+      formulae
+    end
+
+    Brew::Vulns::Formula.stub :load_from_brewfile, load_from_brewfile_mock do
+      Brew::Vulns::CLI.run(["--brewfile", "/path/to/Brewfile"])
+    end
+
+    assert load_from_brewfile_called
+  end
+
+  def test_brewfile_flag_with_deps
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_from_brewfile_mock = lambda do |path, include_deps:|
+      assert include_deps
+      formulae
+    end
+
+    Brew::Vulns::Formula.stub :load_from_brewfile, load_from_brewfile_mock do
+      Brew::Vulns::CLI.run(["-b", "Brewfile", "--deps"])
+    end
+  end
+
+  def test_brewfile_short_flag
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_from_brewfile_called = false
+    load_from_brewfile_mock = lambda do |path, include_deps:|
+      load_from_brewfile_called = true
+      formulae
+    end
+
+    Brew::Vulns::Formula.stub :load_from_brewfile, load_from_brewfile_mock do
+      Brew::Vulns::CLI.run(["-b", "Brewfile"])
+    end
+
+    assert load_from_brewfile_called
+  end
+
+  def test_brewfile_flag_without_path_defaults_to_brewfile
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_from_brewfile_mock = lambda do |path, include_deps:|
+      assert_equal "Brewfile", path
+      formulae
+    end
+
+    Brew::Vulns::Formula.stub :load_from_brewfile, load_from_brewfile_mock do
+      Brew::Vulns::CLI.run(["--brewfile"])
+    end
+  end
 end

@@ -91,6 +91,46 @@ module Brew
         end
       end
 
+      def self.load_from_brewfile(brewfile_path, include_deps: false)
+        raise Error, "Brewfile not found: #{brewfile_path}" unless File.exist?(brewfile_path)
+
+        formula_names = parse_brewfile(brewfile_path)
+        return [] if formula_names.empty?
+
+        json, status = Open3.capture2("brew", "info", "--json=v2", *formula_names)
+        raise Error, "brew info failed with status #{status.exitstatus}" unless status.success?
+
+        data = JSON.parse(json)
+        formulae = data["formulae"].map { |f| new(f) }
+
+        if include_deps
+          dep_names = []
+          formula_names.each do |name|
+            deps_output, = Open3.capture2("brew", "deps", name)
+            dep_names.concat(deps_output.split("\n").map(&:strip))
+          end
+          dep_names.uniq!
+          dep_names -= formula_names
+
+          if dep_names.any?
+            deps_json, deps_status = Open3.capture2("brew", "info", "--json=v2", *dep_names)
+            if deps_status.success?
+              deps_data = JSON.parse(deps_json)
+              formulae.concat(deps_data["formulae"].map { |f| new(f) })
+            end
+          end
+        end
+
+        formulae.uniq { |f| f.name }
+      end
+
+      def self.parse_brewfile(brewfile_path)
+        output, status = Open3.capture2("brew", "bundle", "list", "--file=#{brewfile_path}", "--formula")
+        raise Error, "brew bundle list failed with status #{status.exitstatus}" unless status.success?
+
+        output.split("\n").map(&:strip).reject(&:empty?)
+      end
+
       private
 
       def extract_repo_url(url)

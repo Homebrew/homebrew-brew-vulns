@@ -29,7 +29,8 @@ brew vulns [formula] [options]
 
 | Flag | Long form | Description |
 |------|-----------|-------------|
-| `-d` | `--deps` | Include dependencies when checking a specific formula |
+| `-b PATH` | `--brewfile PATH` | Scan packages from a Brewfile (default: ./Brewfile) |
+| `-d` | `--deps` | Include dependencies when checking a specific formula or Brewfile |
 | `-j` | `--json` | Output results as JSON |
 | | `--sarif` | Output results as SARIF for GitHub code scanning |
 | `-m N` | `--max-summary N` | Truncate summaries to N characters (default: 60, 0 for no limit) |
@@ -47,6 +48,15 @@ brew vulns openssl
 
 # Check a formula and its dependencies
 brew vulns python --deps
+
+# Scan packages from a Brewfile
+brew vulns --brewfile
+
+# Scan a specific Brewfile
+brew vulns -b ~/project/Brewfile
+
+# Scan Brewfile packages and their dependencies
+brew vulns --brewfile --deps
 
 # Output as JSON (useful for CI/CD)
 brew vulns --json

@@ -19,6 +19,7 @@ module Brew
         @help = args.include?("--help") || args.include?("-h")
         @max_summary = parse_max_summary(args)
         @min_severity = parse_severity(args)
+        @brewfile = parse_brewfile_path(args)
       end
 
       def parse_max_summary(args)
@@ -44,6 +45,19 @@ module Brew
           end
         end
         0
+      end
+
+      def parse_brewfile_path(args)
+        args.each_with_index do |arg, idx|
+          if arg == "--brewfile" || arg == "-b"
+            value = args[idx + 1]
+            return value if value && !value.start_with?("-")
+            return "Brewfile"
+          elsif arg.start_with?("--brewfile=")
+            return arg.split("=", 2).last
+          end
+        end
+        nil
       end
 
       def run
@@ -83,7 +97,9 @@ module Brew
       private
 
       def load_formulae
-        if @include_deps && @formula_filter
+        if @brewfile
+          Formula.load_from_brewfile(@brewfile, include_deps: @include_deps)
+        elsif @include_deps && @formula_filter
           Formula.load_with_dependencies(@formula_filter)
         else
           Formula.load_installed(@formula_filter)
@@ -280,7 +296,8 @@ module Brew
             formula              Check only this formula (optional)
 
           Options:
-            -d, --deps           Include dependencies when checking a specific formula
+            -b, --brewfile PATH  Scan packages from a Brewfile (default: ./Brewfile)
+            -d, --deps           Include dependencies when checking a specific formula or Brewfile
             -j, --json           Output results as JSON
             --sarif              Output results as SARIF for GitHub code scanning
             -m, --max-summary N  Truncate summaries to N characters (default: 60, 0 for no limit)
@@ -291,10 +308,11 @@ module Brew
             brew vulns                    Check all installed packages
             brew vulns openssl            Check only openssl
             brew vulns vim --deps         Check vim and its dependencies
+            brew vulns --brewfile         Scan packages listed in ./Brewfile
+            brew vulns -b ~/project/Brewfile  Scan a specific Brewfile
+            brew vulns -b Brewfile --deps Scan Brewfile packages and their dependencies
             brew vulns --json             Output as JSON for CI/CD
             brew vulns --sarif            Output as SARIF for GitHub Actions
-            brew vulns -m 100             Show longer summaries
-            brew vulns -m 0               Show full summaries
             brew vulns --severity high    Only show HIGH and CRITICAL vulnerabilities
         HELP
       end

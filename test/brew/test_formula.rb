@@ -315,4 +315,36 @@ class TestFormula < Minitest::Test
       assert_equal 2, formulae.size
     end
   end
+
+  def test_parse_brewfile_uses_brew_bundle_list
+    bundle_output = "vim\ncurl\nopenssl\n"
+
+    success_status = Minitest::Mock.new
+    success_status.expect :success?, true
+
+    File.stub :exist?, true do
+      Open3.stub :capture2, [bundle_output, success_status] do
+        names = Brew::Vulns::Formula.parse_brewfile("/path/to/Brewfile")
+        assert_equal ["vim", "curl", "openssl"], names
+      end
+    end
+  end
+
+  def test_load_from_brewfile_raises_when_file_not_found
+    assert_raises(Brew::Vulns::Error) do
+      Brew::Vulns::Formula.load_from_brewfile("/nonexistent/Brewfile")
+    end
+  end
+
+  def test_load_from_brewfile_returns_empty_when_no_formulae
+    success_status = Minitest::Mock.new
+    success_status.expect :success?, true
+
+    File.stub :exist?, true do
+      Open3.stub :capture2, ["", success_status] do
+        formulae = Brew::Vulns::Formula.load_from_brewfile("/path/to/Brewfile")
+        assert_equal [], formulae
+      end
+    end
+  end
 end
