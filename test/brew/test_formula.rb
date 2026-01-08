@@ -64,7 +64,7 @@ class TestFormula < Minitest::Test
     assert_equal "https://github.com/AomediaOrg/aom", formula.repo_url
   end
 
-  def test_returns_nil_for_non_github_urls
+  def test_returns_nil_for_unsupported_urls
     data = {
       "name" => "example",
       "versions" => { "stable" => "1.0.0" },
@@ -76,6 +76,41 @@ class TestFormula < Minitest::Test
     formula = Brew::Vulns::Formula.new(data)
 
     assert_nil formula.repo_url
+    refute formula.github?
+    refute formula.supported_forge?
+  end
+
+  def test_extracts_repo_url_from_gitlab_archive_url
+    data = {
+      "name" => "example",
+      "versions" => { "stable" => "1.2.3" },
+      "urls" => {
+        "stable" => { "url" => "https://gitlab.com/owner/repo/-/archive/v1.2.3/repo-v1.2.3.tar.gz" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://gitlab.com/owner/repo", formula.repo_url
+    assert formula.gitlab?
+    assert formula.supported_forge?
+    refute formula.github?
+  end
+
+  def test_extracts_repo_url_from_codeberg_archive_url
+    data = {
+      "name" => "example",
+      "versions" => { "stable" => "1.2.3" },
+      "urls" => {
+        "stable" => { "url" => "https://codeberg.org/owner/repo/archive/v1.2.3.tar.gz" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://codeberg.org/owner/repo", formula.repo_url
+    assert formula.codeberg?
+    assert formula.supported_forge?
     refute formula.github?
   end
 

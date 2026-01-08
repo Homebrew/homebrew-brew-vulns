@@ -27,12 +27,12 @@ module Brew
           return 0
         end
 
-        queryable = formulae.select(&:github?).select(&:tag)
+        queryable = formulae.select(&:supported_forge?).select(&:tag)
         skipped = formulae.size - queryable.size
 
         unless @json_output
           puts "Checking #{queryable.size} packages for vulnerabilities..."
-          puts "(#{skipped} packages skipped - no GitHub source URL)" if skipped > 0
+          puts "(#{skipped} packages skipped - no supported source URL)" if skipped > 0
           puts
         end
 
@@ -67,7 +67,15 @@ module Brew
 
         results = {}
         formulae.each_with_index do |formula, idx|
-          vulns = Vulnerability.from_osv_list(vuln_results[idx] || [])
+          batch_vulns = vuln_results[idx] || []
+          next if batch_vulns.empty?
+
+          full_vulns = batch_vulns.map { |v| client.get_vulnerability(v["id"]) }
+          vulns = Vulnerability.from_osv_list(full_vulns)
+
+          version = formula.tag || formula.version
+          vulns = vulns.select { |v| v.affects_version?(version) }
+
           results[formula] = vulns if vulns.any?
         end
 

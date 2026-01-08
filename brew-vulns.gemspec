@@ -28,4 +28,7 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = ["brew-vulns"]
   spec.require_paths = ["lib"]
+
+  spec.add_dependency "purl", "~> 0.1"
+  spec.add_dependency "vers", "~> 1.0"
 end

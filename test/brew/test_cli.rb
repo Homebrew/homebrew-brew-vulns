@@ -51,8 +51,15 @@ class TestCLI < Minitest::Test
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
         results: [{
-          vulns: [{ "id" => "CVE-2024-1234", "summary" => "Test vuln" }]
+          vulns: [{ "id" => "CVE-2024-1234" }]
         }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => "Test vuln",
+        "database_specific" => { "severity" => "HIGH" }
       }.to_json)
 
     Brew::Vulns::Formula.stub :load_installed, formulae do
@@ -67,12 +74,15 @@ class TestCLI < Minitest::Test
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
         results: [{
-          vulns: [{
-            "id" => "CVE-2024-1234",
-            "summary" => "Test vulnerability",
-            "database_specific" => { "severity" => "HIGH" }
-          }]
+          vulns: [{ "id" => "CVE-2024-1234" }]
         }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => "Test vulnerability",
+        "database_specific" => { "severity" => "HIGH" }
       }.to_json)
 
     output = StringIO.new
@@ -89,15 +99,16 @@ class TestCLI < Minitest::Test
     assert_equal 1, json.size
     assert_equal "vim", json[0]["formula"]
     assert_equal "CVE-2024-1234", json[0]["vulnerabilities"][0]["id"]
+    assert_equal "HIGH", json[0]["vulnerabilities"][0]["severity"]
   end
 
-  def test_skips_non_github_packages
-    non_github_data = {
+  def test_skips_unsupported_source_urls
+    unsupported_data = {
       "name" => "example",
       "versions" => { "stable" => "1.0.0" },
       "urls" => { "stable" => { "url" => "https://example.com/source.tar.gz" } }
     }
-    formulae = [Brew::Vulns::Formula.new(non_github_data)]
+    formulae = [Brew::Vulns::Formula.new(unsupported_data)]
 
     Brew::Vulns::Formula.stub :load_installed, formulae do
       result = Brew::Vulns::CLI.run([])
@@ -161,8 +172,14 @@ class TestCLI < Minitest::Test
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
         results: [{
-          vulns: [{ "id" => "CVE-2024-1234", "summary" => long_summary }]
+          vulns: [{ "id" => "CVE-2024-1234" }]
         }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => long_summary
       }.to_json)
 
     output = StringIO.new
@@ -188,6 +205,9 @@ class TestCLI < Minitest::Test
           vulns: [{ "id" => "CVE-2024-1234" }]
         }]
       }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: { "id" => "CVE-2024-1234" }.to_json)
 
     output = StringIO.new
     original_stdout = $stdout

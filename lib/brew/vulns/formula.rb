@@ -32,6 +32,18 @@ module Brew
         repo_url&.include?("github.com")
       end
 
+      def gitlab?
+        repo_url&.include?("gitlab.com")
+      end
+
+      def codeberg?
+        repo_url&.include?("codeberg.org")
+      end
+
+      def supported_forge?
+        github? || gitlab? || codeberg?
+      end
+
       def to_osv_query
         return nil unless repo_url && tag
 
@@ -83,12 +95,15 @@ module Brew
 
       def extract_repo_url(url)
         return nil unless url
-        return nil unless url.include?("github.com")
 
-        match = url.match(%r{https?://github\.com/([^/]+/[^/]+)})
+        forges = %w[github.com gitlab.com codeberg.org]
+        forge = forges.find { |f| url.include?(f) }
+        return nil unless forge
+
+        match = url.match(%r{https?://#{Regexp.escape(forge)}/([^/]+/[^/]+)})
         if match
-          repo_path = match[1].sub(/\.git$/, "")
-          return "https://github.com/#{repo_path}"
+          repo_path = match[1].sub(/\.git$/, "").sub(%r{/-/.*}, "")
+          return "https://#{forge}/#{repo_path}"
         end
 
         nil
