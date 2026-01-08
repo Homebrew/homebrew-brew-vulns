@@ -1,9 +1,8 @@
 ## [Unreleased]
 
-- Add CycloneDX SBOM output with vulnerabilities (`--cyclonedx`)
-
 ## [0.2.0] - 2026-01-08
 
+- Add CycloneDX SBOM output with vulnerabilities (`--cyclonedx`)
 - Add Brewfile scanning support (`--brewfile`) to check packages from a Brewfile
 - Add SARIF output for GitHub code scanning integration (`--sarif`)
 - Add severity filtering to only show vulnerabilities at or above a threshold (`--severity`)
