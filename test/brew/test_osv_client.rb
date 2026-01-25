@@ -128,21 +128,46 @@ class TestOsvClient < Minitest::Test
     end
   end
 
-  def test_raises_api_error_on_timeout
+  def test_raises_api_error_on_timeout_after_retries
     stub_request(:post, "https://api.osv.dev/v1/query")
       .to_timeout
 
-    assert_raises(Brew::Vulns::OsvClient::ApiError) do
+    error = assert_raises(Brew::Vulns::OsvClient::ApiError) do
       @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
     end
+
+    assert_match(/after 3 attempts/, error.message)
   end
 
-  def test_raises_api_error_on_connection_refused
+  def test_raises_api_error_on_connection_refused_after_retries
     stub_request(:post, "https://api.osv.dev/v1/query")
       .to_raise(Errno::ECONNREFUSED)
 
-    assert_raises(Brew::Vulns::OsvClient::ApiError) do
+    error = assert_raises(Brew::Vulns::OsvClient::ApiError) do
       @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
     end
+
+    assert_match(/after 3 attempts/, error.message)
+  end
+
+  def test_retries_on_timeout_then_succeeds
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_timeout.then
+      .to_return(status: 200, body: { vulns: [{ id: "CVE-2024-1234" }] }.to_json)
+
+    vulns = @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal 1, vulns.size
+    assert_equal "CVE-2024-1234", vulns.first["id"]
+  end
+
+  def test_retries_on_connection_error_then_succeeds
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_raise(Errno::ECONNREFUSED).then
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    vulns = @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal [], vulns
   end
 end

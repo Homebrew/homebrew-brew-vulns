@@ -11,6 +11,8 @@ module Brew
       BATCH_SIZE = 1000
       OPEN_TIMEOUT = 10
       READ_TIMEOUT = 30
+      MAX_RETRIES = 3
+      RETRY_DELAY = 1
 
       class Error < StandardError; end
       class ApiError < Error; end
@@ -78,28 +80,41 @@ module Brew
       end
 
       def execute_request(uri, request)
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = uri.scheme == "https"
-        http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-        http.open_timeout = OPEN_TIMEOUT
-        http.read_timeout = READ_TIMEOUT
+        attempts = 0
 
-        response = http.request(request)
+        begin
+          attempts += 1
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = uri.scheme == "https"
+          http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+          http.open_timeout = OPEN_TIMEOUT
+          http.read_timeout = READ_TIMEOUT
 
-        case response
-        when Net::HTTPSuccess
-          JSON.parse(response.body)
-        else
-          raise ApiError, "OSV API error: #{response.code} #{response.message}"
+          response = http.request(request)
+
+          case response
+          when Net::HTTPSuccess
+            JSON.parse(response.body)
+          else
+            raise ApiError, "OSV API error: #{response.code} #{response.message}"
+          end
+        rescue JSON::ParserError => e
+          raise ApiError, "Invalid JSON response from OSV API: #{e.message}"
+        rescue Net::OpenTimeout, Net::ReadTimeout => e
+          if attempts < MAX_RETRIES
+            sleep RETRY_DELAY
+            retry
+          end
+          raise ApiError, "OSV API timeout after #{attempts} attempts: #{e.message}"
+        rescue SocketError, Errno::ECONNREFUSED => e
+          if attempts < MAX_RETRIES
+            sleep RETRY_DELAY
+            retry
+          end
+          raise ApiError, "OSV API connection error after #{attempts} attempts: #{e.message}"
+        rescue OpenSSL::SSL::SSLError => e
+          raise ApiError, "OSV API SSL error: #{e.message}"
         end
-      rescue JSON::ParserError => e
-        raise ApiError, "Invalid JSON response from OSV API: #{e.message}"
-      rescue Net::OpenTimeout, Net::ReadTimeout => e
-        raise ApiError, "OSV API timeout: #{e.message}"
-      rescue SocketError, Errno::ECONNREFUSED => e
-        raise ApiError, "OSV API connection error: #{e.message}"
-      rescue OpenSSL::SSL::SSLError => e
-        raise ApiError, "OSV API SSL error: #{e.message}"
       end
 
       def fetch_all_pages(response, original_payload)
