@@ -7,21 +7,25 @@ on:
 
   pull_request:
 
+permissions: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     name: Ruby ${{ matrix.ruby }}
+    permissions:
+      contents: read
     strategy:
       matrix:
         ruby:
           - '4.0.0'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@09a7688d3b55cf0e976497ff046b70949eeaccfd # v1.288.0
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
