@@ -1,26 +1,36 @@
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# This file is synced from the `.github` repository, do not modify it directly.
+---
 version: 2
 updates:
-  - package-ecosystem: bundler
-    directory: "/"
-    schedule:
-      interval: weekly
-    groups:
-      bundler:
-        patterns:
-          - "*"
-    cooldown:
-      default-days: 7
+- package-ecosystem: bundler
+  directories:
+  - "/"
+  schedule:
+    interval: weekly
+    day: friday
+    time: '08:00'
+    timezone: Etc/UTC
+  groups:
+    bundler:
+      patterns:
+      - "*"
+  allow:
+  - dependency-type: all
+  cooldown:
+    default-days: 7
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: weekly
+    day: friday
+    time: '08:00'
+    timezone: Etc/UTC
+  groups:
+    github-actions:
+      patterns:
+      - "*"
+  allow:
+  - dependency-type: all
+  cooldown:
+    default-days: 7
 
-  - package-ecosystem: github-actions
-    directory: "/"
-    schedule:
-      interval: weekly
-    groups:
-      github-actions:
-        patterns:
-          - "*"
-    cooldown:
-      default-days: 7
