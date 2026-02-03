@@ -1,7 +1,7 @@
 class BrewVulns < Formula
   desc "Check Homebrew packages for known vulnerabilities via osv.dev"
-  homepage "https://github.com/andrew/brew-vulns"
-  url "https://github.com/andrew/brew-vulns/archive/refs/tags/v0.2.2.tar.gz"
+  homepage "https://github.com/homebrew/brew-vulns"
+  url "https://github.com/homebrew/brew-vulns/archive/refs/tags/v0.2.2.tar.gz"
   sha256 "64abf7791eb7d04312c1fda9dc49a73f3702f5716ce18506324ed9f401fe2514"
   license "MIT"
 

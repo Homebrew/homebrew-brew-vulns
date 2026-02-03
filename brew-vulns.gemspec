@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Check Homebrew packages for known vulnerabilities"
   spec.description = "A Homebrew subcommand that checks installed packages for vulnerabilities via osv.dev"
-  spec.homepage = "https://github.com/andrewnesbitt/brew-vulns"
+  spec.homepage = "https://github.com/homebrew/brew-vulns"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
 

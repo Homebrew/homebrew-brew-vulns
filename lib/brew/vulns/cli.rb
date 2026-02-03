@@ -251,7 +251,7 @@ module Brew
                 driver: Sarif::ToolComponent.new(
                   name: "brew-vulns",
                   version: VERSION,
-                  information_uri: "https://github.com/andrew/brew-vulns",
+                  information_uri: "https://github.com/homebrew/brew-vulns",
                   rules: rules.uniq { |r| r.id }
                 )
               ),

@@ -14,7 +14,7 @@ task :update_formula do
   require_relative "lib/brew/vulns/version"
 
   version = Brew::Vulns::VERSION
-  url = "https://github.com/andrew/brew-vulns/archive/refs/tags/v#{version}.tar.gz"
+  url = "https://github.com/homebrew/brew-vulns/archive/refs/tags/v#{version}.tar.gz"
   formula_path = File.expand_path("Formula/brew-vulns.rb", __dir__)
 
   puts "Downloading #{url}..."
@@ -23,7 +23,7 @@ task :update_formula do
   puts "SHA256: #{sha256}"
 
   formula = File.read(formula_path)
-  formula.gsub!(%r{url "https://github.com/andrew/brew-vulns/archive/refs/tags/v[^"]+\.tar\.gz"},
+  formula.gsub!(%r{url "https://github.com/homebrew/brew-vulns/archive/refs/tags/v[^"]+\.tar\.gz"},
                 "url \"#{url}\"")
   formula.gsub!(/sha256 "[^"]+"/, "sha256 \"#{sha256}\"")
   File.write(formula_path, formula)
