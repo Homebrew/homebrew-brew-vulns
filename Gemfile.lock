@@ -33,6 +33,7 @@ GEM
       simpleidn (~> 0.2)
     minitest (6.0.1)
       prism (~> 1.5)
+    minitest-mock (5.27.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
@@ -80,6 +81,7 @@ DEPENDENCIES
   brew-vulns!
   irb
   minitest (~> 6.0)
+  minitest-mock
   rake (~> 13.0)
   simplecov (~> 0.22)
   webmock (~> 3.0)
@@ -98,6 +100,7 @@ CHECKSUMS
   irb (1.16.0) sha256=2abe56c9ac947cdcb2f150572904ba798c1e93c890c256f8429981a7675b0806
   json_schemer (2.5.0) sha256=2f01fb4cce721a4e08dd068fc2030cffd0702a7f333f1ea2be6e8991f00ae396
   minitest (6.0.1) sha256=7854c74f48e2e975969062833adc4013f249a4b212f5e7b9d5c040bf838d54bb
+  minitest-mock (5.27.0) sha256=7040ed7185417a966920987eaa6eaf1be4ea1fc5b25bb03ff4703f98564a55b0
   pp (0.6.3) sha256=2951d514450b93ccfeb1df7d021cae0da16e0a7f95ee1e2273719669d0ab9df6
   prettyprint (0.2.0) sha256=2bc9e15581a94742064a3cc8b0fb9d45aae3d03a1baa6ef80922627a0766f193
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85

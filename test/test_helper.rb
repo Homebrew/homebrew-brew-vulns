@@ -9,6 +9,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "brew/vulns"
 
 require "minitest/autorun"
+require "minitest/mock"
 require "webmock/minitest"
 
 def capture_stdout
