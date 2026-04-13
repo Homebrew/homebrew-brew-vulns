@@ -15,6 +15,13 @@ module Brew
       MAX_RETRIES = 3
       RETRY_DELAY = 1
 
+      # Sent alongside each real query. OSV's normalize_tag extracts digit-runs;
+      # digit-free strings collapse to "" and fuzzy-match any digit-free tag in
+      # an affected range (e.g. "last-cvs-commit"). If real and canary return
+      # identical non-empty sets, the real tag hit the same degenerate match.
+      # See issue #41 and google/osv.dev gcp/api/server.py:_match_versions.
+      CANARY_VERSION = "brew-vulns-canary"
+
       class Error < StandardError; end
       class ApiError < Error; end
 
@@ -37,24 +44,36 @@ module Brew
         return [] if packages.empty?
 
         results = Array.new(packages.size) { [] }
+        # Each package costs two query slots (real + canary).
+        slice_size = BATCH_SIZE / 2
 
-        packages.each_slice(BATCH_SIZE).with_index do |batch, batch_idx|
-          queries = batch.map do |pkg|
-            {
-              package: {
-                name: pkg[:repo_url],
-                ecosystem: "GIT"
-              },
-              version: pkg[:version]
-            }
+        packages.each_slice(slice_size).with_index do |batch, batch_idx|
+          queries = []
+          batch.each do |pkg|
+            package_ref = { name: pkg[:repo_url], ecosystem: "GIT" }
+            queries << { package: package_ref, version: pkg[:version] }
+            queries << { package: package_ref, version: CANARY_VERSION }
           end
 
           response = post("/querybatch", { queries: queries })
           batch_results = response["results"] || []
 
-          batch_results.each_with_index do |result, idx|
-            global_idx = batch_idx * BATCH_SIZE + idx
-            results[global_idx] = result["vulns"] || []
+          batch.each_with_index do |pkg, idx|
+            global_idx = batch_idx * slice_size + idx
+            real   = batch_results[idx * 2]     || {}
+            canary = batch_results[idx * 2 + 1] || {}
+
+            real_ids   = (real["vulns"]   || []).map { |v| v["id"] }.sort
+            canary_ids = (canary["vulns"] || []).map { |v| v["id"] }.sort
+
+            if !canary_ids.empty? && real_ids == canary_ids
+              warn "Warning: OSV could not resolve #{pkg[:name] || pkg[:repo_url]} " \
+                   "tag #{pkg[:version].inspect}; skipping (results matched " \
+                   "default-branch fallback)"
+              results[global_idx] = []
+            else
+              results[global_idx] = real["vulns"] || []
+            end
           end
         end
 
