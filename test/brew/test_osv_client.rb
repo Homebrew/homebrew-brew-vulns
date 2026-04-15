@@ -36,6 +36,20 @@ class TestOsvClient < Minitest::Test
     assert_equal [], vulns
   end
 
+  def test_sets_user_agent_header
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .with(
+        headers: {
+          "User-Agent" => %r{\Abrew-vulns/\d+\.\d+\.\d+ \(\+https://github\.com/Homebrew/homebrew-brew-vulns\)\z}
+        }
+      )
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_requested :post, "https://api.osv.dev/v1/query"
+  end
+
   def test_query_batch_returns_results_for_each_package
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(
