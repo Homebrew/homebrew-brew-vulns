@@ -649,4 +649,40 @@ class TestCLI < Minitest::Test
     assert sbom["components"].any? { |c| c["name"] == "vim" }
     assert_empty sbom["vulnerabilities"] || []
   end
+
+  def test_scan_vulnerabilities_limits_active_threads
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+    fake_cves = Array.new(50) { |i| { "id" => "CVE-#{i}" } }
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: fake_cves }] }.to_json)
+    fake_cves.each do |cve|
+      stub_request(:get, "https://api.osv.dev/v1/vulns/#{cve["id"]}")
+        .to_return(status: 200, body: { "id" => cve["id"], "summary" => "Test vulnerability" }
+        .to_json)
+    end
+
+    max_threads = 0
+    current_threads = 0
+    # stub thread creation to track how many threads are active at the same time
+    Thread.stub(:new, proc { |*args, **kwargs, &block|
+      current_threads += 1
+      max_threads = [max_threads, current_threads].max
+      Thread.start do
+        begin
+          block.call(*args, **kwargs)
+        ensure
+          current_threads -= 1
+        end
+      end
+    }) do
+      Brew::Vulns::Formula.stub :load_installed, formulae do
+        Brew::Vulns::CLI.run([])
+      end
+    end
+
+    assert max_threads <= Brew::Vulns::CLI::MAX_VULN_FETCH_THREADS,
+           "More than #{Brew::Vulns::CLI::MAX_VULN_FETCH_THREADS} threads " \
+           "were running concurrently: #{max_threads}"
+  end
 end
