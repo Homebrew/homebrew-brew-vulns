@@ -9,6 +9,7 @@ module Brew
 
       DEFAULT_MAX_SUMMARY = 60
       SEVERITY_LEVELS = { "low" => 1, "medium" => 2, "high" => 3, "critical" => 4 }.freeze
+      MAX_VULN_FETCH_THREADS = 15
 
       def initialize(args)
         @args = args
@@ -118,10 +119,13 @@ module Brew
           batch_vulns = vuln_results[idx] || []
           next if batch_vulns.empty?
 
-          threads = batch_vulns.map do |v|
-            Thread.new { client.get_vulnerability(v["id"]) }
+          full_vulns = batch_vulns.each_slice(MAX_VULN_FETCH_THREADS).flat_map do |slice|
+            threads = slice.map do |v|
+              Thread.new { client.get_vulnerability(v["id"]) }
+            end
+            threads.map(&:value)
           end
-          full_vulns = threads.map(&:value)
+
           vulns = Vulnerability.from_osv_list(full_vulns)
 
           version = formula.tag || formula.version
