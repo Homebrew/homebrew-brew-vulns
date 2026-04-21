@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Set User-Agent header on OSV API requests (#49)
+
 ## [0.2.2] - 2026-01-25
 
 - Add retry logic to OSV API requests (up to 3 attempts on timeout or connection errors)

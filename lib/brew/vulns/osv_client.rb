@@ -3,6 +3,7 @@
 require "net/http"
 require "json"
 require "uri"
+require "brew/vulns/version"
 
 module Brew
   module Vulns
@@ -16,6 +17,8 @@ module Brew
 
       class Error < StandardError; end
       class ApiError < Error; end
+
+      USER_AGENT = "brew-vulns/#{Brew::Vulns::VERSION} (+https://github.com/Homebrew/homebrew-brew-vulns)"
 
       def query(repo_url:, version:)
         payload = {
@@ -66,6 +69,7 @@ module Brew
         uri = URI("#{API_BASE}#{path}")
         request = Net::HTTP::Post.new(uri)
         request["Content-Type"] = "application/json"
+        request["User-Agent"] = USER_AGENT
         request.body = JSON.generate(payload)
 
         execute_request(uri, request)
@@ -75,6 +79,7 @@ module Brew
         uri = URI("#{API_BASE}#{path}")
         request = Net::HTTP::Get.new(uri)
         request["Content-Type"] = "application/json"
+        request["User-Agent"] = USER_AGENT
 
         execute_request(uri, request)
       end
