@@ -5,7 +5,9 @@ require "minitest/test_task"
 require "digest"
 require "open-uri"
 
-Minitest::TestTask.create
+Minitest::TestTask.create do |t|
+  t.framework = %(require "test/test_helper.rb")
+end
 
 task default: :test
 
