@@ -791,7 +791,7 @@ class TestCLI < Minitest::Test
     captured_body = nil
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .with { |req| captured_body = JSON.parse(req.body) }
-      .to_return(status: 200, body: { results: [{}, {}, {}, {}] }.to_json)
+      .to_return(status: 200, body: { results: [{}, {}] }.to_json)
 
     Brew::Vulns::Formula.stub :load_installed, formulae do
       Brew::Vulns::CLI.run([])
@@ -799,11 +799,9 @@ class TestCLI < Minitest::Test
 
     refute_nil captured_body
     queries = captured_body["queries"]
-    # Two formulae × (real + canary) = four queries. Real queries sit at
-    # even indices.
-    assert_equal 4, queries.size
-    real_queries = queries.each_slice(2).map(&:first)
-    real_queries.each do |q|
+    # Two formulae with digit-bearing versions = two queries, no canaries.
+    assert_equal 2, queries.size
+    queries.each do |q|
       refute_nil q["version"], "query #{q.inspect} sent nil version"
       refute_empty q["version"], "query #{q.inspect} sent empty version"
       refute_equal Brew::Vulns::OsvClient::CANARY_VERSION, q["version"]
@@ -824,8 +822,8 @@ class TestCLI < Minitest::Test
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
         results: [
-          { vulns: [{ "id" => "VULN-FOR-VIM" }] }, {},
-          { vulns: [{ "id" => "VULN-FOR-CURL" }] }, {}
+          { vulns: [{ "id" => "VULN-FOR-VIM" }] },
+          { vulns: [{ "id" => "VULN-FOR-CURL" }] }
         ]
       }.to_json)
 

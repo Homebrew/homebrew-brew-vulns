@@ -51,18 +51,14 @@ class TestOsvClient < Minitest::Test
   end
 
   def test_query_batch_returns_results_for_each_package
-    # Response order is [real0, canary0, real1, canary1, real2, canary2].
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(
         status: 200,
         body: {
           results: [
             { vulns: [{ id: "CVE-2024-1111" }] },
-            {},
             { vulns: [] },
-            {},
-            { vulns: [{ id: "CVE-2024-2222" }, { id: "CVE-2024-3333" }] },
-            {}
+            { vulns: [{ id: "CVE-2024-2222" }, { id: "CVE-2024-3333" }] }
           ]
         }.to_json
       )
@@ -86,28 +82,27 @@ class TestOsvClient < Minitest::Test
     assert_equal [], results
   end
 
-  def test_query_batch_interleaves_canary_queries
+  def test_query_batch_adds_canary_only_for_digit_free_versions
     captured = nil
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .with { |req| captured = JSON.parse(req.body) }
-      .to_return(status: 200, body: { results: [{}, {}, {}, {}] }.to_json)
+      .to_return(status: 200, body: { results: [{}, {}, {}] }.to_json)
 
     packages = [
       { repo_url: "https://github.com/a/a", version: "v1.0" },
-      { repo_url: "https://github.com/b/b", version: "v2.0" }
+      { repo_url: "https://github.com/b/b", version: "HEAD" }
     ]
     @client.query_batch(packages)
 
+    # Only the digit-free version gets a paired canary query.
     queries = captured["queries"]
-    assert_equal 4, queries.size
+    assert_equal 3, queries.size
     assert_equal "v1.0", queries[0]["version"]
-    assert_equal Brew::Vulns::OsvClient::CANARY_VERSION, queries[1]["version"]
-    assert_equal "v2.0", queries[2]["version"]
-    assert_equal Brew::Vulns::OsvClient::CANARY_VERSION, queries[3]["version"]
+    assert_equal "HEAD", queries[1]["version"]
+    assert_equal Brew::Vulns::OsvClient::CANARY_VERSION, queries[2]["version"]
     assert_equal "https://github.com/a/a", queries[0]["package"]["name"]
-    assert_equal "https://github.com/a/a", queries[1]["package"]["name"]
+    assert_equal "https://github.com/b/b", queries[1]["package"]["name"]
     assert_equal "https://github.com/b/b", queries[2]["package"]["name"]
-    assert_equal "https://github.com/b/b", queries[3]["package"]["name"]
   end
 
   def test_query_batch_skips_when_real_matches_canary
@@ -122,12 +117,32 @@ class TestOsvClient < Minitest::Test
         ]
       }.to_json)
 
-    packages = [{ repo_url: "https://github.com/a/a", version: "v9.9.9", name: "a" }]
+    packages = [{ repo_url: "https://github.com/a/a", version: "HEAD", name: "a" }]
 
     err = capture_stderr { @results = @client.query_batch(packages) }
 
     assert_equal [[]], @results
-    assert_match(/OSV could not resolve a tag "v9.9.9"/, err)
+    assert_match(/OSV could not resolve a tag "HEAD"/, err)
+  end
+
+  def test_query_batch_never_skips_digit_bearing_version
+    # A vuln with introduced:0 and no fix affects every commit. If we sent a
+    # canary for a normal digit-bearing version, real and canary would match
+    # and we'd wrongly suppress it. Digit-bearing versions must not be gated.
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{ vulns: [{ id: "CVE-2024-OPEN" }] }]
+      }.to_json)
+
+    packages = [{ repo_url: "https://github.com/a/a", version: "v9.9.9", name: "a" }]
+
+    err = capture_stderr { @results = @client.query_batch(packages) }
+
+    assert_equal "CVE-2024-OPEN", @results[0][0]["id"]
+    assert_empty err
+    assert_requested(:post, "https://api.osv.dev/v1/querybatch") do |req|
+      JSON.parse(req.body)["queries"].size == 1
+    end
   end
 
   def test_query_batch_keeps_results_when_real_differs_from_canary
@@ -139,7 +154,7 @@ class TestOsvClient < Minitest::Test
         ]
       }.to_json)
 
-    packages = [{ repo_url: "https://github.com/a/a", version: "release-78.3", name: "icu" }]
+    packages = [{ repo_url: "https://github.com/a/a", version: "main", name: "icu" }]
 
     err = capture_stderr { @results = @client.query_batch(packages) }
 
@@ -159,7 +174,7 @@ class TestOsvClient < Minitest::Test
         ]
       }.to_json)
 
-    packages = [{ repo_url: "https://github.com/a/a", version: "v1.0", name: "a" }]
+    packages = [{ repo_url: "https://github.com/a/a", version: "main", name: "a" }]
     results = @client.query_batch(packages)
 
     assert_equal 1, results[0].size
@@ -175,27 +190,28 @@ class TestOsvClient < Minitest::Test
         ]
       }.to_json)
 
-    packages = [{ repo_url: "https://github.com/a/a", version: "v1.0", name: "a" }]
+    packages = [{ repo_url: "https://github.com/a/a", version: "main", name: "a" }]
     results = @client.query_batch(packages)
 
     assert_equal [], results[0]
   end
 
   def test_query_batch_canary_only_affects_matching_package
-    # Three packages: middle one hits the fallback, the others are fine.
+    # Three packages: middle one is digit-free and hits the fallback, the
+    # others have normal versions and are not canary-checked.
     fallback = [{ id: "CVE-2017-1111" }]
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
         results: [
-          { vulns: [{ id: "CVE-2024-AAAA" }] }, {},
+          { vulns: [{ id: "CVE-2024-AAAA" }] },
           { vulns: fallback }, { vulns: fallback },
-          { vulns: [{ id: "CVE-2024-CCCC" }] }, {}
+          { vulns: [{ id: "CVE-2024-CCCC" }] }
         ]
       }.to_json)
 
     packages = [
       { repo_url: "https://github.com/a/a", version: "v1", name: "a" },
-      { repo_url: "https://github.com/b/b", version: "v2", name: "b" },
+      { repo_url: "https://github.com/b/b", version: "HEAD", name: "b" },
       { repo_url: "https://github.com/c/c", version: "v3", name: "c" }
     ]
     results = @client.query_batch(packages)
@@ -244,20 +260,21 @@ class TestOsvClient < Minitest::Test
 
     results = @client.query_batch(packages)
 
+    # All versions contain digits, so no canaries are sent.
     assert_equal 2, captured.size
-    assert_equal slice_size * 2, captured[0].size
-    assert_equal 6, captured[1].size
+    assert_equal slice_size, captured[0].size
+    assert_equal 3, captured[1].size
 
     assert_equal total, results.size
 
     # First package of batch 0 sits at request 0, query slot 0.
     assert_equal "REQ0-Q0", results[0][0]["id"]
-    # Last package of batch 0 sits at request 0, query slot 998 (499 * 2).
-    assert_equal "REQ0-Q#{(slice_size - 1) * 2}", results[slice_size - 1][0]["id"]
+    # Last package of batch 0 sits at request 0, query slot 499.
+    assert_equal "REQ0-Q#{slice_size - 1}", results[slice_size - 1][0]["id"]
     # First package of batch 1 sits at request 1, query slot 0.
     assert_equal "REQ1-Q0", results[slice_size][0]["id"]
-    # Last package overall sits at request 1, query slot 4 (2 * 2).
-    assert_equal "REQ1-Q4", results[total - 1][0]["id"]
+    # Last package overall sits at request 1, query slot 2.
+    assert_equal "REQ1-Q2", results[total - 1][0]["id"]
 
     # No off-by-one gaps anywhere in the merged results.
     refute results.any?(&:empty?)
@@ -269,6 +286,7 @@ class TestOsvClient < Minitest::Test
     packages = Array.new(slice_size + 1) do |i|
       { repo_url: "https://github.com/x/p#{i}", version: "v#{i}", name: "p#{i}" }
     end
+    packages[slice_size][:version] = "HEAD"
 
     fallback = [{ id: "CVE-OLD" }]
     call = 0
@@ -279,8 +297,8 @@ class TestOsvClient < Minitest::Test
         if call == 1
           { status: 200, body: { results: Array.new(n) { {} } }.to_json }
         else
-          # Second request has one package: real and canary both get the
-          # fallback set.
+          # Second request has one digit-free package: real and canary both
+          # get the fallback set.
           { status: 200, body: { results: [{ vulns: fallback }, { vulns: fallback }] }.to_json }
         end
       end

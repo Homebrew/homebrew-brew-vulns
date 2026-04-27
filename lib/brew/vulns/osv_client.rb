@@ -44,15 +44,23 @@ module Brew
         return [] if packages.empty?
 
         results = Array.new(packages.size) { [] }
-        # Each package costs two query slots (real + canary).
+        # Worst case every version is digit-free and gets a canary, so slice at
+        # half the limit to guarantee queries.size <= BATCH_SIZE.
         slice_size = BATCH_SIZE / 2
 
         packages.each_slice(slice_size).with_index do |batch, batch_idx|
           queries = []
+          offsets = []
           batch.each do |pkg|
             package_ref = { name: pkg[:repo_url], ecosystem: "GIT" }
+            real_idx = queries.size
             queries << { package: package_ref, version: pkg[:version] }
-            queries << { package: package_ref, version: CANARY_VERSION }
+            canary_idx = nil
+            unless pkg[:version].to_s.match?(/\d/)
+              canary_idx = queries.size
+              queries << { package: package_ref, version: CANARY_VERSION }
+            end
+            offsets << [real_idx, canary_idx]
           end
 
           response = post("/querybatch", { queries: queries })
@@ -60,20 +68,20 @@ module Brew
 
           batch.each_with_index do |pkg, idx|
             global_idx = batch_idx * slice_size + idx
-            real   = batch_results[idx * 2]     || {}
-            canary = batch_results[idx * 2 + 1] || {}
+            real_idx, canary_idx = offsets[idx]
+            real = batch_results[real_idx] || {}
+            results[global_idx] = real["vulns"] || []
+            next unless canary_idx
 
-            real_ids   = (real["vulns"]   || []).map { |v| v["id"] }.sort
+            canary = batch_results[canary_idx] || {}
+            real_ids   = results[global_idx].map { |v| v["id"] }.sort
             canary_ids = (canary["vulns"] || []).map { |v| v["id"] }.sort
+            next if canary_ids.empty? || real_ids != canary_ids
 
-            if !canary_ids.empty? && real_ids == canary_ids
-              warn "Warning: OSV could not resolve #{pkg[:name] || pkg[:repo_url]} " \
-                   "tag #{pkg[:version].inspect}; skipping (results matched " \
-                   "default-branch fallback)"
-              results[global_idx] = []
-            else
-              results[global_idx] = real["vulns"] || []
-            end
+            warn "Warning: OSV could not resolve #{pkg[:name] || pkg[:repo_url]} " \
+                 "tag #{pkg[:version].inspect}; skipping (results matched " \
+                 "default-branch fallback)"
+            results[global_idx] = []
           end
         end
 
