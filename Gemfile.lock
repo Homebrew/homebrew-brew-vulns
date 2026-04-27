@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     brew-vulns (0.2.3)
+      cvss-suite (~> 4.1)
       purl (~> 1.6)
       sarif-ruby (~> 0.1)
       sbom (~> 0.4)
@@ -16,6 +17,7 @@ GEM
     crack (1.0.1)
       bigdecimal
       rexml
+    cvss-suite (4.1.0)
     date (3.5.1)
     docile (1.4.1)
     drb (2.2.3)
@@ -94,6 +96,7 @@ CHECKSUMS
   bigdecimal (4.1.1) sha256=1c09efab961da45203c8316b0cdaec0ff391dfadb952dd459584b63ebf8054ca
   brew-vulns (0.2.3)
   crack (1.0.1) sha256=ff4a10390cd31d66440b7524eb1841874db86201d5b70032028553130b6d4c7e
+  cvss-suite (4.1.0) sha256=156590c22bb3ccebbc6be270b516759780264ab2b838b4ac2ecd3ee47712c8be
   date (3.5.1) sha256=750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0
   docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
