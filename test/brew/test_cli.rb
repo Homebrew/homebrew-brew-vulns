@@ -685,4 +685,168 @@ class TestCLI < Minitest::Test
            "More than #{Brew::Vulns::CLI::MAX_VULN_FETCH_THREADS} threads " \
            "were running concurrently: #{max_threads}"
   end
+
+  # Regression guard for issue #41.
+  # When OSV's GIT-ecosystem tag resolution lags behind a new release, the
+  # batch endpoint can return CVEs from years ago. The local affects_version?
+  # filter at cli.rb:128 is the safety net. This test simulates OSV
+  # over-returning and verifies only the vuln whose explicit versions list
+  # contains the installed tag survives.
+  def test_local_filter_drops_legacy_cves_when_osv_over_returns
+    icu_data = {
+      "name" => "icu4c@78",
+      "versions" => { "stable" => "78.3" },
+      "urls" => {
+        "stable" => {
+          "url" => "https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78.3-sources.tgz"
+        }
+      }
+    }
+    formulae = [Brew::Vulns::Formula.new(icu_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [
+            { "id" => "CVE-2016-6293" },
+            { "id" => "CVE-2017-14952" },
+            { "id" => "OSV-2023-1328" }
+          ]
+        }]
+      }.to_json)
+
+    # Old CVE: versions list contains only release-57-1, GIT range only.
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2016-6293")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2016-6293",
+        "summary" => "Stack-based buffer overflow",
+        "database_specific" => { "severity" => "CRITICAL" },
+        "affected" => [{
+          "versions" => ["release-57-1"],
+          "ranges" => [{
+            "type" => "GIT",
+            "events" => [
+              { "introduced" => "0" },
+              { "last_affected" => "0c5873f89bf64f6bbc0a24b84f07d79b25785a42" }
+            ]
+          }]
+        }]
+      }.to_json)
+
+    # Another old CVE: hyphenated old releases only.
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2017-14952")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2017-14952",
+        "summary" => "Double free",
+        "database_specific" => { "severity" => "CRITICAL" },
+        "affected" => [{
+          "versions" => ["release-58-1", "release-58-2", "release-59-1", "release-59-rc"],
+          "ranges" => [{
+            "type" => "GIT",
+            "events" => [{ "introduced" => "0" }, { "fixed" => "abc123" }]
+          }]
+        }]
+      }.to_json)
+
+    # Current vuln: versions list explicitly names release-78.3.
+    stub_request(:get, "https://api.osv.dev/v1/vulns/OSV-2023-1328")
+      .to_return(status: 200, body: {
+        "id" => "OSV-2023-1328",
+        "summary" => "Stack-buffer-overflow in TZDBTimeZoneNames",
+        "affected" => [{
+          "package" => { "name" => "icu", "ecosystem" => "OSS-Fuzz" },
+          "ecosystem_specific" => { "severity" => "HIGH" },
+          "versions" => ["release-77-1", "release-78.1", "release-78.2", "release-78.3"],
+          "ranges" => [{
+            "type" => "GIT",
+            "events" => [{ "introduced" => "5cf5ec1adbd2332b3cc289b5b1f5ca8324275fc3" }]
+          }]
+        }]
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run(["--json"]) }
+    end
+
+    json = JSON.parse(output)
+
+    assert_equal 1, json.size
+    assert_equal "icu4c@78", json[0]["formula"]
+    ids = json[0]["vulnerabilities"].map { |v| v["id"] }
+    assert_equal ["OSV-2023-1328"], ids
+    refute_includes ids, "CVE-2016-6293"
+    refute_includes ids, "CVE-2017-14952"
+  end
+
+  # The query payload sent to OSV must always carry a non-empty version.
+  # An empty or null version makes OSV return every vuln ever filed against
+  # the repo. This test asserts the batch request body never contains
+  # version: "" or version: null for any formula that passed the pre-filter.
+  def test_batch_query_never_sends_empty_version
+    formulae = [
+      Brew::Vulns::Formula.new(@vim_data),
+      Brew::Vulns::Formula.new(@curl_data)
+    ]
+
+    captured_body = nil
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .with { |req| captured_body = JSON.parse(req.body) }
+      .to_return(status: 200, body: { results: [{}, {}] }.to_json)
+
+    Brew::Vulns::Formula.stub :load_installed, formulae do
+      Brew::Vulns::CLI.run([])
+    end
+
+    refute_nil captured_body
+    queries = captured_body["queries"]
+    # Two formulae with digit-bearing versions = two queries, no canaries.
+    assert_equal 2, queries.size
+    queries.each do |q|
+      refute_nil q["version"], "query #{q.inspect} sent nil version"
+      refute_empty q["version"], "query #{q.inspect} sent empty version"
+      refute_equal Brew::Vulns::OsvClient::CANARY_VERSION, q["version"]
+    end
+  end
+
+  # Results must be attributed to the right formula by index. If anything
+  # between map(&:to_osv_query) and results lookup ever shifts indices,
+  # vim's vulns would land on curl. This test puts a distinctive vuln ID at
+  # each batch position and checks each comes back attached to the formula
+  # that sent that query.
+  def test_batch_results_align_with_formulae
+    formulae = [
+      Brew::Vulns::Formula.new(@vim_data),
+      Brew::Vulns::Formula.new(@curl_data)
+    ]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [
+          { vulns: [{ "id" => "VULN-FOR-VIM" }] },
+          { vulns: [{ "id" => "VULN-FOR-CURL" }] }
+        ]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/VULN-FOR-VIM")
+      .to_return(status: 200, body: {
+        "id" => "VULN-FOR-VIM",
+        "database_specific" => { "severity" => "HIGH" }
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/VULN-FOR-CURL")
+      .to_return(status: 200, body: {
+        "id" => "VULN-FOR-CURL",
+        "database_specific" => { "severity" => "HIGH" }
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run(["--json"]) }
+    end
+
+    json = JSON.parse(output)
+    by_formula = json.to_h { |entry| [entry["formula"], entry["vulnerabilities"].map { |v| v["id"] }] }
+
+    assert_equal ["VULN-FOR-VIM"], by_formula["vim"]
+    assert_equal ["VULN-FOR-CURL"], by_formula["curl"]
+  end
 end
