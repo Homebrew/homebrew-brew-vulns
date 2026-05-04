@@ -294,10 +294,11 @@ module Brew
 
             line = "  #{vuln.id} (#{severity})"
             if vuln.summary
-              summary = if @max_summary > 0 && vuln.summary.length > @max_summary
-                "#{vuln.summary.slice(0, @max_summary)}..."
+              sanitized_summary = sanitize_terminal_escapes(vuln.summary)
+              summary = if @max_summary > 0 && sanitized_summary.length > @max_summary
+                "#{sanitized_summary.slice(0, @max_summary)}..."
               else
-                vuln.summary
+                sanitized_summary
               end
               line = "#{line} - #{summary}"
             end
@@ -312,6 +313,13 @@ module Brew
 
         puts "Found #{total_vulns} vulnerabilities in #{results.size} packages"
         1
+      end
+
+      def sanitize_terminal_escapes(text)
+        text
+          .gsub(/\e\][^\a]*(?:\a|\e\\)/, "")
+          .gsub(/\e\[[0-?]*[ -\/]*[@-~]/, "")
+          .delete("\e")
       end
 
       def colorize_severity(severity)

@@ -283,6 +283,33 @@ class TestCLI < Minitest::Test
     refute_includes output, " - \n"
   end
 
+  def test_text_output_sanitizes_terminal_escapes_from_summary
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+    summary = "safe \e[2J\e[31mred\e[0m \e]0;pwned\a text"
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [{ "id" => "CVE-2024-1234" }]
+        }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => summary
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run([]) }
+    end
+
+    assert_includes output, "safe red  text"
+    refute_includes output, "\e"
+    refute_includes output, "[2J"
+    refute_includes output, "pwned"
+  end
+
   def test_severity_flag_filters_vulnerabilities
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 
