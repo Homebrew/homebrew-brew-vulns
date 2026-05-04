@@ -287,12 +287,12 @@ module Brew
         sorted = results.sort_by { |_, vulns| -vulns.map(&:severity_level).max }
 
         sorted.each do |formula, vulns|
-          puts "#{formula.name} (#{formula.version})"
+          puts "#{sanitize_terminal_escapes(formula.name)} (#{sanitize_terminal_escapes(formula.version)})"
           vulns.sort_by { |v| -v.severity_level }.each do |vuln|
             total_vulns += 1
             severity = colorize_severity(vuln.severity_display)
 
-            line = "  #{vuln.id} (#{severity})"
+            line = "  #{sanitize_terminal_escapes(vuln.id)} (#{severity})"
             if vuln.summary
               sanitized_summary = sanitize_terminal_escapes(vuln.summary)
               summary = if @max_summary > 0 && sanitized_summary.length > @max_summary
@@ -305,7 +305,8 @@ module Brew
             puts line
 
             if vuln.fixed_versions.any?
-              puts "    Fixed in: #{vuln.fixed_versions.join(", ")}"
+              fixed_versions = vuln.fixed_versions.map { |version| sanitize_terminal_escapes(version) }
+              puts "    Fixed in: #{fixed_versions.join(", ")}"
             end
           end
           puts
@@ -316,10 +317,12 @@ module Brew
       end
 
       def sanitize_terminal_escapes(text)
-        text
+        text.to_s
           .gsub(/\e\][^\a]*(?:\a|\e\\)/, "")
+          .gsub(/\u009d[^\a]*(?:\a|\u009c)/, "")
+          .gsub(/\u009b[0-?]*[ -\/]*[@-~]/, "")
           .gsub(/\e\[[0-?]*[ -\/]*[@-~]/, "")
-          .delete("\e")
+          .delete("\e\u0080-\u009f")
       end
 
       def colorize_severity(severity)
