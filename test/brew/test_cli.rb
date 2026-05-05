@@ -285,7 +285,7 @@ class TestCLI < Minitest::Test
 
   def test_text_output_sanitizes_terminal_escapes_from_summary
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
-    summary = "safe \e[2J\e[31mred\e[0m \e]0;pwned\a c1 \u009b2Jblue\u009d0;owned\a text"
+    summary = "safe \e[2J\e[31mred\e[0m \e]0;pwned\a c1 \u009b2Jblue\u009d0;owned\a \rhidden\b text"
 
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: {
@@ -304,10 +304,12 @@ class TestCLI < Minitest::Test
       capture_stdout { Brew::Vulns::CLI.run([]) }
     end
 
-    assert_includes output, "safe red  c1 blue text"
+    assert_includes output, "safe red  c1 blue hidden text"
     refute_includes output, "\e"
     refute_includes output, "\u009b"
     refute_includes output, "\u009d"
+    refute_includes output, "\r"
+    refute_includes output, "\b"
     refute_includes output, "[2J"
     refute_includes output, "pwned"
     refute_includes output, "owned"

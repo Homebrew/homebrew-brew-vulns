@@ -318,11 +318,11 @@ module Brew
 
       def sanitize_terminal_escapes(text)
         text.to_s
-          .gsub(/\e\][^\a]*(?:\a|\e\\)/, "")
-          .gsub(/\u009d[^\a]*(?:\a|\u009c)/, "")
+          .gsub(/\e\][^\a\e]*(?:\a|\e\\)/, "")
+          .gsub(/\u009d[^\a\u009c]*(?:\a|\u009c)/, "")
           .gsub(/\u009b[0-?]*[ -\/]*[@-~]/, "")
           .gsub(/\e\[[0-?]*[ -\/]*[@-~]/, "")
-          .delete("\e\u0080-\u009f")
+          .delete("\e\b\r\u0007\u0080-\u009f")
       end
 
       def colorize_severity(severity)
