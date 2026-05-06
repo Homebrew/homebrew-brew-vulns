@@ -283,6 +283,83 @@ class TestCLI < Minitest::Test
     refute_includes output, " - \n"
   end
 
+  def test_text_output_sanitizes_terminal_escapes_from_summary
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+    summary = "safe \e[2J\e[31mred\e[0m \e]0;pwned\a c1 \u009b2Jblue\u009d0;owned\a \rhidden\b text"
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [{ "id" => "CVE-2024-1234" }]
+        }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => summary
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run([]) }
+    end
+
+    assert_includes output, "safe red  c1 blue hidden text"
+    refute_includes output, "\e"
+    refute_includes output, "\u009b"
+    refute_includes output, "\u009d"
+    refute_includes output, "\r"
+    refute_includes output, "\b"
+    refute_includes output, "[2J"
+    refute_includes output, "pwned"
+    refute_includes output, "owned"
+  end
+
+  def test_text_output_sanitizes_terminal_escapes_from_other_fields
+    formulae = [
+      Brew::Vulns::Formula.new(
+        @vim_data.merge(
+          "name" => "vim\e[2J",
+          "versions" => { "stable" => "9.1.0\e[31m" }
+        )
+      )
+    ]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [{ "id" => "CVE-2024-1234" }]
+        }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234\e[2J",
+        "affected" => [
+          {
+            "versions" => ["v9.1.0"],
+            "ranges" => [
+              {
+                "events" => [
+                  { "fixed" => "1.2.3\e[31m" }
+                ]
+              }
+            ]
+          }
+        ]
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run([]) }
+    end
+
+    assert_includes output, "vim (9.1.0)"
+    assert_includes output, "CVE-2024-1234 (UNKNOWN)"
+    assert_includes output, "Fixed in: 1.2.3"
+    refute_includes output, "\e"
+    refute_includes output, "[2J"
+  end
+
   def test_severity_flag_filters_vulnerabilities
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 
