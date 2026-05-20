@@ -10,10 +10,11 @@ module Brew
       DEFAULT_MAX_SUMMARY = 60
       SEVERITY_LEVELS = { "low" => 1, "medium" => 2, "high" => 3, "critical" => 4 }.freeze
       MAX_VULN_FETCH_THREADS = 15
+      FLAGS_WITH_VALUE = %w[-b --brewfile -m --max-summary -s --severity].freeze
 
       def initialize(args)
         @args = args
-        @formula_filter = args.first unless args.first&.start_with?("-")
+        @formula_names = parse_formula_names(args)
         @include_deps = args.include?("--deps") || args.include?("-d")
         @json_output = args.include?("--json") || args.include?("-j")
         @sarif_output = args.include?("--sarif")
@@ -22,6 +23,25 @@ module Brew
         @max_summary = parse_max_summary(args)
         @min_severity = parse_severity(args)
         @brewfile = parse_brewfile_path(args)
+      end
+
+      def parse_formula_names(args)
+        names = []
+        skip_next = false
+        args.each do |arg|
+          if skip_next
+            skip_next = false
+            next
+          end
+          if FLAGS_WITH_VALUE.include?(arg)
+            skip_next = true
+            next
+          end
+          next if arg.start_with?("-")
+
+          names << arg
+        end
+        names
       end
 
       def parse_max_summary(args)
@@ -70,7 +90,7 @@ module Brew
 
         formulae = load_formulae
         if formulae.empty?
-          puts "No installed formulae found."
+          puts "No formulae found."
           return 0
         end
 
@@ -101,10 +121,10 @@ module Brew
       def load_formulae
         if @brewfile
           Formula.load_from_brewfile(@brewfile, include_deps: @include_deps)
-        elsif @include_deps && @formula_filter
-          Formula.load_with_dependencies(@formula_filter)
+        elsif @formula_names.any?
+          Formula.load_named(@formula_names, include_deps: @include_deps)
         else
-          Formula.load_installed(@formula_filter)
+          Formula.load_installed
         end
       end
 
@@ -339,12 +359,12 @@ module Brew
 
       def print_help
         puts <<~HELP
-          Usage: brew vulns [formula] [options]
+          Usage: brew vulns [formula...] [options]
 
-          Check installed Homebrew packages for known vulnerabilities via osv.dev.
+          Check Homebrew packages for known vulnerabilities via osv.dev.
 
           Arguments:
-            formula              Check only this formula (optional)
+            formula              Check only the named formulae (optional, does not need to be installed)
 
           Options:
             -b, --brewfile PATH  Scan packages from a Brewfile (default: ./Brewfile)
@@ -359,6 +379,7 @@ module Brew
           Examples:
             brew vulns                    Check all installed packages
             brew vulns openssl            Check only openssl
+            brew vulns vim curl jq        Check several formulae at once
             brew vulns vim --deps         Check vim and its dependencies
             brew vulns --brewfile         Scan packages listed in ./Brewfile
             brew vulns -b ~/project/Brewfile  Scan a specific Brewfile

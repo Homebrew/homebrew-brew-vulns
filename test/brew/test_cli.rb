@@ -128,18 +128,57 @@ class TestCLI < Minitest::Test
 
   def test_filters_by_formula_name
     vim = Brew::Vulns::Formula.new(@vim_data)
-    curl = Brew::Vulns::Formula.new(@curl_data)
-
-    load_mock = lambda do |filter|
-      filter == "vim" ? [vim] : [vim, curl]
-    end
 
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
 
-    Brew::Vulns::Formula.stub :load_installed, load_mock do
+    load_named_called = false
+    load_named_mock = lambda do |names, include_deps:|
+      load_named_called = true
+      assert_equal ["vim"], names
+      refute include_deps
+      [vim]
+    end
+
+    Brew::Vulns::Formula.stub :load_named, load_named_mock do
       result = Brew::Vulns::CLI.run(["vim"])
       assert_equal 0, result
+    end
+
+    assert load_named_called
+  end
+
+  def test_multiple_formula_names
+    vim = Brew::Vulns::Formula.new(@vim_data)
+    curl = Brew::Vulns::Formula.new(@curl_data)
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }, { vulns: [] }] }.to_json)
+
+    load_named_mock = lambda do |names, include_deps:|
+      assert_equal ["vim", "curl"], names
+      [vim, curl]
+    end
+
+    Brew::Vulns::Formula.stub :load_named, load_named_mock do
+      result = Brew::Vulns::CLI.run(["vim", "curl"])
+      assert_equal 0, result
+    end
+  end
+
+  def test_formula_names_ignore_flag_values
+    vim = Brew::Vulns::Formula.new(@vim_data)
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_named_mock = lambda do |names, include_deps:|
+      assert_equal ["vim"], names
+      [vim]
+    end
+
+    Brew::Vulns::Formula.stub :load_named, load_named_mock do
+      Brew::Vulns::CLI.run(["-m", "80", "vim", "-s", "high"])
     end
   end
 
@@ -149,18 +188,19 @@ class TestCLI < Minitest::Test
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
       .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
 
-    load_with_deps_called = false
-    load_with_deps_mock = lambda do |filter|
-      load_with_deps_called = true
-      assert_equal "vim", filter
+    load_named_called = false
+    load_named_mock = lambda do |names, include_deps:|
+      load_named_called = true
+      assert_equal ["vim"], names
+      assert include_deps
       [vim]
     end
 
-    Brew::Vulns::Formula.stub :load_with_dependencies, load_with_deps_mock do
+    Brew::Vulns::Formula.stub :load_named, load_named_mock do
       Brew::Vulns::CLI.run(["vim", "--deps"])
     end
 
-    assert load_with_deps_called
+    assert load_named_called
   end
 
   def test_output_truncates_long_summaries
