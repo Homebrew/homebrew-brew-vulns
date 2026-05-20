@@ -578,7 +578,7 @@ class TestCLI < Minitest::Test
     assert_includes ["note", nil], result["level"]
   end
 
-  def test_all_flag_loads_from_formulae_api
+  def test_all_flag_uses_load_all
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 
     stub_request(:post, "https://api.osv.dev/v1/querybatch")

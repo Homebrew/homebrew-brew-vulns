@@ -71,7 +71,7 @@ module Brew
 
         formulae = load_formulae
         if formulae.empty?
-          puts "No installed formulae found."
+          puts "No formulae found."
           return 0
         end
 
