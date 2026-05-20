@@ -108,7 +108,8 @@ Found 15 vulnerabilities in 3 packages
 ## Exit codes
 
 - `0` - No vulnerabilities found
-- `1` - Vulnerabilities found (or error occurred)
+- `1` - Vulnerabilities found
+- `2` - An error occurred (network failure, `brew` failure, parse error)
 
 This makes it suitable for use in CI/CD pipelines.
 
