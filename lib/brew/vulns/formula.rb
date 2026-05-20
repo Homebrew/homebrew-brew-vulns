@@ -50,6 +50,14 @@ module Brew
         { repo_url: repo_url, version: tag, name: name }
       end
 
+      def self.load_all
+        json, status = Open3.capture2("brew", "info", "--json=v2", "--eval-all")
+        raise Error, "brew info failed with status #{status.exitstatus}" unless status.success?
+
+        data = JSON.parse(json)
+        data["formulae"].map { |f| new(f) }
+      end
+
       def self.load_installed(formula_filter = nil)
         json, status = Open3.capture2("brew", "info", "--json=v2", "--installed")
         raise Error, "brew info failed with status #{status.exitstatus}" unless status.success?

@@ -578,6 +578,53 @@ class TestCLI < Minitest::Test
     assert_includes ["note", nil], result["level"]
   end
 
+  def test_all_flag_uses_load_all
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    load_all_called = false
+    load_all_mock = lambda do
+      load_all_called = true
+      formulae
+    end
+
+    Brew::Vulns::Formula.stub :load_all, load_all_mock do
+      result = Brew::Vulns::CLI.run(["--all"])
+      assert_equal 0, result
+    end
+
+    assert load_all_called
+  end
+
+  def test_all_flag_with_json_output
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [{ "id" => "CVE-2024-1234" }]
+        }]
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id" => "CVE-2024-1234",
+        "summary" => "Test vulnerability",
+        "database_specific" => { "severity" => "HIGH" }
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_all, formulae do
+      capture_stdout { Brew::Vulns::CLI.run(["--all", "--json"]) }
+    end
+    json = JSON.parse(output)
+
+    assert_equal 1, json.size
+    assert_equal "vim", json[0]["formula"]
+    assert_equal "CVE-2024-1234", json[0]["vulnerabilities"][0]["id"]
+  end
+
   def test_brewfile_flag_loads_from_brewfile
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 
