@@ -27,24 +27,28 @@ jobs:
         id: changed
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           cd "$(brew --repository "${GITHUB_REPOSITORY}")"
-          names=$(git diff --name-only --diff-filter=AM "${BASE_SHA}...${HEAD_SHA}" -- Formula/ \
+          git fetch --quiet --depth=1 origin "${BASE_SHA}"
+          names=$(git diff --name-only --diff-filter=AM "${BASE_SHA}" -- Formula/ \
             | xargs -r -n1 basename \
             | sed 's/\.rb$//' \
             | tr '\n' ' ')
           echo "names=${names}" >> "${GITHUB_OUTPUT}"
 
       - name: Check vulnerabilities
+        id: scan
         if: steps.changed.outputs.names != ''
         env:
           FORMULAE: ${{ steps.changed.outputs.names }}
-        run: brew vulns ${FORMULAE} --sarif > vulns.sarif
-        continue-on-error: true
+        run: |
+          brew vulns ${FORMULAE} --sarif > vulns.sarif || true
+          if [ -s vulns.sarif ]; then
+            echo "sarif=true" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Upload SARIF
-        if: steps.changed.outputs.names != ''
+        if: steps.scan.outputs.sarif == 'true'
         uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           sarif_file: vulns.sarif

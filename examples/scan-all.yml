@@ -25,6 +25,9 @@ jobs:
         run: brew vulns --all --json > vulns.json
         continue-on-error: true
 
+      - name: Validate output
+        run: ruby -rjson -e 'abort "vulns.json is not a JSON array" unless JSON.load_file("vulns.json").is_a?(Array)'
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -36,5 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create vulns --title "Vulnerability data" --notes "Rolling vulnerability scan of homebrew-core" || true
+          if ! gh release view vulns >/dev/null 2>&1; then
+            gh release create vulns --title "Vulnerability data" --notes "Rolling vulnerability scan of homebrew-core"
+          fi
           gh release upload vulns vulns.json --clobber
