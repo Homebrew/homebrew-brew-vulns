@@ -160,6 +160,96 @@ class TestFormula < Minitest::Test
     assert_equal ["gettext", "libsodium", "lua"], formula.dependencies
   end
 
+  def test_load_named_queries_brew_info_without_installed
+    brew_json = {
+      "formulae" => [
+        {
+          "name" => "vim",
+          "versions" => { "stable" => "9.1.0" },
+          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
+        },
+        {
+          "name" => "curl",
+          "versions" => { "stable" => "8.5.0" },
+          "urls" => { "stable" => { "url" => "https://github.com/curl/curl/archive/refs/tags/curl-8_5_0.tar.gz" } }
+        }
+      ]
+    }.to_json
+
+    success_status = Minitest::Mock.new
+    success_status.expect :success?, true
+
+    capture_mock = lambda do |*args|
+      assert_equal ["brew", "info", "--json=v2", "vim", "curl"], args
+      [brew_json, success_status]
+    end
+
+    Open3.stub :capture2, capture_mock do
+      formulae = Brew::Vulns::Formula.load_named(["vim", "curl"])
+      assert_equal 2, formulae.size
+      assert_equal "vim", formulae[0].name
+      assert_equal "curl", formulae[1].name
+    end
+  end
+
+  def test_load_named_returns_empty_for_empty_input
+    assert_equal [], Brew::Vulns::Formula.load_named([])
+  end
+
+  def test_load_named_raises_on_brew_failure
+    failed_status = Minitest::Mock.new
+    failed_status.expect :success?, false
+    failed_status.expect :exitstatus, 1
+
+    Open3.stub :capture2, ["", failed_status] do
+      assert_raises(Brew::Vulns::Error) do
+        Brew::Vulns::Formula.load_named(["nonexistent"])
+      end
+    end
+  end
+
+  def test_load_named_with_deps_includes_dependencies
+    brew_json = {
+      "formulae" => [
+        {
+          "name" => "vim",
+          "versions" => { "stable" => "9.1.0" },
+          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
+        }
+      ]
+    }.to_json
+
+    deps_json = {
+      "formulae" => [
+        {
+          "name" => "gettext",
+          "versions" => { "stable" => "0.22" },
+          "urls" => { "stable" => { "url" => "https://github.com/gnu/gettext/archive/refs/tags/v0.22.tar.gz" } }
+        }
+      ]
+    }.to_json
+
+    success_status = Minitest::Mock.new
+    3.times { success_status.expect :success?, true }
+
+    capture_mock = lambda do |*args|
+      case args
+      when ["brew", "info", "--json=v2", "vim"]
+        [brew_json, success_status]
+      when ["brew", "deps", "vim"]
+        ["gettext\n", success_status]
+      when ["brew", "info", "--json=v2", "gettext"]
+        [deps_json, success_status]
+      end
+    end
+
+    Open3.stub :capture2, capture_mock do
+      formulae = Brew::Vulns::Formula.load_named(["vim"], include_deps: true)
+      names = formulae.map(&:name).sort
+      assert_equal ["gettext", "vim"], names
+    end
+  end
+
   def test_load_installed_parses_brew_output
     brew_json = {
       "formulae" => [
@@ -187,57 +277,6 @@ class TestFormula < Minitest::Test
     end
   end
 
-  def test_load_installed_filters_by_name
-    brew_json = {
-      "formulae" => [
-        {
-          "name" => "vim",
-          "versions" => { "stable" => "9.1.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
-        },
-        {
-          "name" => "curl",
-          "versions" => { "stable" => "8.5.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/curl/curl/archive/refs/tags/curl-8_5_0.tar.gz" } }
-        }
-      ]
-    }.to_json
-
-    success_status = Minitest::Mock.new
-    success_status.expect :success?, true
-
-    Open3.stub :capture2, [brew_json, success_status] do
-      formulae = Brew::Vulns::Formula.load_installed("vim")
-      assert_equal 1, formulae.size
-      assert_equal "vim", formulae[0].name
-    end
-  end
-
-  def test_load_installed_filters_versioned_formulae
-    brew_json = {
-      "formulae" => [
-        {
-          "name" => "python@3.11",
-          "versions" => { "stable" => "3.11.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/python/cpython/archive/refs/tags/v3.11.0.tar.gz" } }
-        },
-        {
-          "name" => "python@3.12",
-          "versions" => { "stable" => "3.12.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/python/cpython/archive/refs/tags/v3.12.0.tar.gz" } }
-        }
-      ]
-    }.to_json
-
-    success_status = Minitest::Mock.new
-    success_status.expect :success?, true
-
-    Open3.stub :capture2, [brew_json, success_status] do
-      formulae = Brew::Vulns::Formula.load_installed("python")
-      assert_equal 2, formulae.size
-    end
-  end
-
   def test_load_installed_raises_on_brew_failure
     failed_status = Minitest::Mock.new
     failed_status.expect :success?, false
@@ -247,74 +286,6 @@ class TestFormula < Minitest::Test
       assert_raises(Brew::Vulns::Error) do
         Brew::Vulns::Formula.load_installed
       end
-    end
-  end
-
-  def test_load_with_dependencies_includes_deps
-    brew_json = {
-      "formulae" => [
-        {
-          "name" => "vim",
-          "versions" => { "stable" => "9.1.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
-        },
-        {
-          "name" => "gettext",
-          "versions" => { "stable" => "0.22" },
-          "urls" => { "stable" => { "url" => "https://github.com/gnu/gettext/archive/refs/tags/v0.22.tar.gz" } }
-        },
-        {
-          "name" => "lua",
-          "versions" => { "stable" => "5.4.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/lua/lua/archive/refs/tags/v5.4.0.tar.gz" } }
-        }
-      ]
-    }.to_json
-
-    deps_output = "gettext\nlua\n"
-
-    success_status = Minitest::Mock.new
-    2.times { success_status.expect :success?, true }
-
-    call_count = 0
-    capture_mock = lambda do |*args|
-      call_count += 1
-      if call_count == 1
-        [brew_json, success_status]
-      else
-        [deps_output, success_status]
-      end
-    end
-
-    Open3.stub :capture2, capture_mock do
-      formulae = Brew::Vulns::Formula.load_with_dependencies("vim")
-      names = formulae.map(&:name).sort
-      assert_equal ["gettext", "lua", "vim"], names
-    end
-  end
-
-  def test_load_with_dependencies_without_filter_returns_all
-    brew_json = {
-      "formulae" => [
-        {
-          "name" => "vim",
-          "versions" => { "stable" => "9.1.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
-        },
-        {
-          "name" => "curl",
-          "versions" => { "stable" => "8.5.0" },
-          "urls" => { "stable" => { "url" => "https://github.com/curl/curl/archive/refs/tags/curl-8_5_0.tar.gz" } }
-        }
-      ]
-    }.to_json
-
-    success_status = Minitest::Mock.new
-    success_status.expect :success?, true
-
-    Open3.stub :capture2, [brew_json, success_status] do
-      formulae = Brew::Vulns::Formula.load_with_dependencies
-      assert_equal 2, formulae.size
     end
   end
 

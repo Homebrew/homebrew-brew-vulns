@@ -50,51 +50,15 @@ module Brew
         { repo_url: repo_url, version: tag, name: name }
       end
 
-      def self.load_installed(formula_filter = nil)
+      def self.load_installed
         json, status = Open3.capture2("brew", "info", "--json=v2", "--installed")
         raise Error, "brew info failed with status #{status.exitstatus}" unless status.success?
 
         data = JSON.parse(json)
-        formulae = data["formulae"].map { |f| new(f) }
-
-        if formula_filter
-          formulae.select! { |f| f.name == formula_filter || f.name.split("@").first == formula_filter }
-        end
-
-        formulae
+        data["formulae"].map { |f| new(f) }
       end
 
-      def self.load_with_dependencies(formula_filter = nil)
-        json, status = Open3.capture2("brew", "info", "--json=v2", "--installed")
-        raise Error, "brew info failed with status #{status.exitstatus}" unless status.success?
-
-        data = JSON.parse(json)
-        all_formulae = data["formulae"].map { |f| new(f) }
-        formulae_by_name = all_formulae.each_with_object({}) { |f, h| h[f.name] = f }
-
-        if formula_filter
-          filtered = all_formulae.select { |f| f.name == formula_filter || f.name.split("@").first == formula_filter }
-          return [] if filtered.empty?
-
-          deps_output, = Open3.capture2("brew", "deps", "--installed", formula_filter)
-          dep_names = deps_output.split("\n").map(&:strip)
-
-          result = filtered.each_with_object({}) { |f, h| h[f.name] = f }
-          dep_names.each do |dep_name|
-            dep = formulae_by_name[dep_name]
-            result[dep_name] = dep if dep && !result[dep_name]
-          end
-
-          result.values
-        else
-          all_formulae
-        end
-      end
-
-      def self.load_from_brewfile(brewfile_path, include_deps: false)
-        raise Error, "Brewfile not found: #{brewfile_path}" unless File.exist?(brewfile_path)
-
-        formula_names = parse_brewfile(brewfile_path)
+      def self.load_named(formula_names, include_deps: false)
         return [] if formula_names.empty?
 
         json, status = Open3.capture2("brew", "info", "--json=v2", *formula_names)
@@ -122,6 +86,13 @@ module Brew
         end
 
         formulae.uniq { |f| f.name }
+      end
+
+      def self.load_from_brewfile(brewfile_path, include_deps: false)
+        raise Error, "Brewfile not found: #{brewfile_path}" unless File.exist?(brewfile_path)
+
+        formula_names = parse_brewfile(brewfile_path)
+        load_named(formula_names, include_deps: include_deps)
       end
 
       def self.parse_brewfile(brewfile_path)
