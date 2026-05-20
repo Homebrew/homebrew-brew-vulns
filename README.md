@@ -111,7 +111,7 @@ Found 15 vulnerabilities in 3 packages
 - `1` - Vulnerabilities found
 - `2` - An error occurred (network failure, `brew` failure, parse error)
 
-This makes it suitable for use in CI/CD pipelines.
+This makes it suitable for use in CI/CD pipelines. To let a job continue when vulnerabilities are found but still fail on scan errors, use `brew vulns ... || [ $? -eq 1 ]`.
 
 ## GitHub Actions
 
@@ -135,8 +135,7 @@ jobs:
         run: gem install brew-vulns
 
       - name: Run vulnerability scan
-        run: brew vulns --sarif > results.sarif
-        continue-on-error: true
+        run: brew vulns --sarif > results.sarif || [ $? -eq 1 ]
 
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
@@ -168,8 +167,7 @@ jobs:
         run: gem install brew-vulns
 
       - name: Generate SBOM
-        run: brew vulns --cyclonedx > sbom.cdx.json
-        continue-on-error: true
+        run: brew vulns --cyclonedx > sbom.cdx.json || [ $? -eq 1 ]
 
       - name: Submit to dependency graph
         uses: evryfs/sbom-dependency-submission-action@v0

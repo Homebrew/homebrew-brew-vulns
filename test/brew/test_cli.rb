@@ -133,6 +133,13 @@ class TestCLI < Minitest::Test
     end
   end
 
+  def test_json_parse_error_returns_two
+    Brew::Vulns::Formula.stub :load_installed, ->(*) { raise JSON::ParserError, "unexpected token" } do
+      result = Brew::Vulns::CLI.run([])
+      assert_equal 2, result
+    end
+  end
+
   def test_filters_by_formula_name
     vim = Brew::Vulns::Formula.new(@vim_data)
     curl = Brew::Vulns::Formula.new(@curl_data)
