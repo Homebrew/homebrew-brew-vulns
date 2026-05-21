@@ -87,13 +87,13 @@ module Brew
         output_results(results, formulae)
       rescue OsvClient::Error => e
         $stderr.puts "Error querying OSV: #{e.message}"
-        1
+        2
       rescue Error => e
         $stderr.puts "Error: #{e.message}"
-        1
+        2
       rescue JSON::ParserError => e
         $stderr.puts "Error parsing brew output: #{e.message}"
-        1
+        2
       end
 
       private
