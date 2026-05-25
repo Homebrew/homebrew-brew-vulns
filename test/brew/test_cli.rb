@@ -114,7 +114,7 @@ class TestCLI < Minitest::Test
     end
   end
 
-  def test_api_error_returns_one
+  def test_api_error_returns_two
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 
     stub_request(:post, "https://api.osv.dev/v1/querybatch")
@@ -122,7 +122,21 @@ class TestCLI < Minitest::Test
 
     Brew::Vulns::Formula.stub :load_installed, formulae do
       result = Brew::Vulns::CLI.run([])
-      assert_equal 1, result
+      assert_equal 2, result
+    end
+  end
+
+  def test_load_error_returns_two
+    Brew::Vulns::Formula.stub :load_installed, ->(*) { raise Brew::Vulns::Error, "boom" } do
+      result = Brew::Vulns::CLI.run([])
+      assert_equal 2, result
+    end
+  end
+
+  def test_json_parse_error_returns_two
+    Brew::Vulns::Formula.stub :load_installed, ->(*) { raise JSON::ParserError, "unexpected token" } do
+      result = Brew::Vulns::CLI.run([])
+      assert_equal 2, result
     end
   end
 
