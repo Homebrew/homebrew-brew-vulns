@@ -21,7 +21,7 @@ Once installed, the command is available as `brew vulns`.
 ## Usage
 
 ```bash
-brew vulns [formula] [options]
+brew vulns [formula...] [options]
 ```
 
 ### Options
@@ -43,8 +43,11 @@ brew vulns [formula] [options]
 # Check all installed packages
 brew vulns
 
-# Check a specific formula
+# Check a specific formula (does not need to be installed)
 brew vulns openssl
+
+# Check several formulae at once
+brew vulns vim curl jq
 
 # Check a formula and its dependencies
 brew vulns python --deps
@@ -82,7 +85,7 @@ brew vulns --help
 
 ## How it works
 
-1. Reads installed Homebrew formulae via `brew info --json=v2 --installed`
+1. Reads Homebrew formulae via `brew info --json=v2` (installed packages by default, or any named formulae passed as arguments)
 2. Extracts the repository URL and version tag from each formula's source URL
 3. Queries the OSV API using the GIT ecosystem to find known vulnerabilities
 4. Reports any vulnerabilities found with their severity and CVE identifiers
