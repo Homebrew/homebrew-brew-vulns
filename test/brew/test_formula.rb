@@ -160,6 +160,49 @@ class TestFormula < Minitest::Test
     assert_equal ["gettext", "libsodium", "lua"], formula.dependencies
   end
 
+  def test_load_all_parses_brew_eval_all_output
+    brew_json = {
+      "formulae" => [
+        {
+          "name" => "vim",
+          "versions" => { "stable" => "9.1.0" },
+          "urls" => { "stable" => { "url" => "https://github.com/vim/vim/archive/refs/tags/v9.1.0.tar.gz" } }
+        },
+        {
+          "name" => "a2ps",
+          "versions" => { "stable" => "4.15.8" },
+          "urls" => { "stable" => { "url" => "https://ftpmirror.gnu.org/gnu/a2ps/a2ps-4.15.8.tar.gz" } }
+        }
+      ],
+      "casks" => []
+    }.to_json
+
+    success_status = Minitest::Mock.new
+    success_status.expect :success?, true
+
+    Open3.stub :capture2, [brew_json, success_status] do
+      formulae = Brew::Vulns::Formula.load_all
+
+      assert_equal 2, formulae.size
+      assert_equal "vim", formulae[0].name
+      assert_equal "https://github.com/vim/vim", formulae[0].repo_url
+      assert_equal "a2ps", formulae[1].name
+      assert_nil formulae[1].repo_url
+    end
+  end
+
+  def test_load_all_raises_on_brew_failure
+    failed_status = Minitest::Mock.new
+    failed_status.expect :success?, false
+    failed_status.expect :exitstatus, 1
+
+    Open3.stub :capture2, ["", failed_status] do
+      assert_raises(Brew::Vulns::Error) do
+        Brew::Vulns::Formula.load_all
+      end
+    end
+  end
+
   def test_load_named_queries_brew_info_without_installed
     brew_json = {
       "formulae" => [

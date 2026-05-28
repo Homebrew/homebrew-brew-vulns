@@ -28,6 +28,7 @@ brew vulns [formula...] [options]
 
 | Flag | Long form | Description |
 |------|-----------|-------------|
+| | `--all` | Scan every formula in homebrew-core |
 | `-b PATH` | `--brewfile PATH` | Scan packages from a Brewfile (default: ./Brewfile) |
 | `-d` | `--deps` | Include dependencies when checking a specific formula or Brewfile |
 | `-j` | `--json` | Output results as JSON |
@@ -42,6 +43,9 @@ brew vulns [formula...] [options]
 ```bash
 # Check all installed packages
 brew vulns
+
+# Scan every formula in homebrew-core
+brew vulns --all --json > vulns.json
 
 # Check a specific formula (does not need to be installed)
 brew vulns openssl

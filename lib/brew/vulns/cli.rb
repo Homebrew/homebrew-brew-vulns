@@ -15,6 +15,7 @@ module Brew
       def initialize(args)
         @args = args
         @formula_names = parse_formula_names(args)
+        @all = args.include?("--all")
         @include_deps = args.include?("--deps") || args.include?("-d")
         @json_output = args.include?("--json") || args.include?("-j")
         @sarif_output = args.include?("--sarif")
@@ -119,7 +120,9 @@ module Brew
       private
 
       def load_formulae
-        if @brewfile
+        if @all
+          Formula.load_all
+        elsif @brewfile
           Formula.load_from_brewfile(@brewfile, include_deps: @include_deps)
         elsif @formula_names.any?
           Formula.load_named(@formula_names, include_deps: @include_deps)
@@ -367,6 +370,7 @@ module Brew
             formula              Check only the named formulae (optional, does not need to be installed)
 
           Options:
+            --all                Scan every formula in homebrew-core
             -b, --brewfile PATH  Scan packages from a Brewfile (default: ./Brewfile)
             -d, --deps           Include dependencies when checking a specific formula or Brewfile
             -j, --json           Output results as JSON
@@ -378,6 +382,7 @@ module Brew
 
           Examples:
             brew vulns                    Check all installed packages
+            brew vulns --all --json       Scan every homebrew-core formula, output JSON
             brew vulns openssl            Check only openssl
             brew vulns vim curl jq        Check several formulae at once
             brew vulns vim --deps         Check vim and its dependencies
