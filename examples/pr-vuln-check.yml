@@ -42,7 +42,7 @@ jobs:
         env:
           FORMULAE: ${{ steps.changed.outputs.names }}
         run: |
-          brew vulns ${FORMULAE} --sarif > vulns.sarif || true
+          brew vulns ${FORMULAE} --sarif > vulns.sarif || [ $? -eq 1 ]
           if [ -s vulns.sarif ]; then
             echo "sarif=true" >> "${GITHUB_OUTPUT}"
           fi
