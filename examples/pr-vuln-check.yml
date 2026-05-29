@@ -1,0 +1,55 @@
+# Check formulae changed in a pull request for known vulnerabilities.
+# Intended for use in a Homebrew tap (e.g. homebrew-core).
+name: Vulnerability check
+
+on:
+  pull_request:
+    paths:
+      - "Formula/**/*.rb"
+
+permissions: {}
+
+jobs:
+  vulns:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+      - name: Install brew-vulns
+        run: brew install homebrew/brew-vulns/brew-vulns
+
+      - name: Detect changed formulae
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          cd "$(brew --repository "${GITHUB_REPOSITORY}")"
+          git fetch --quiet --depth=1 origin "${BASE_SHA}"
+          names=$(git diff --name-only --diff-filter=AM "${BASE_SHA}" -- Formula/ \
+            | xargs -r -n1 basename \
+            | sed 's/\.rb$//' \
+            | tr '\n' ' ')
+          echo "names=${names}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check vulnerabilities
+        id: scan
+        if: steps.changed.outputs.names != ''
+        env:
+          FORMULAE: ${{ steps.changed.outputs.names }}
+        run: |
+          brew vulns ${FORMULAE} --sarif > vulns.sarif || [ $? -eq 1 ]
+          if [ -s vulns.sarif ]; then
+            echo "sarif=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload SARIF
+        if: steps.scan.outputs.sarif == 'true'
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: vulns.sarif
+          category: brew-vulns

@@ -184,6 +184,8 @@ jobs:
 
 This adds your Homebrew packages to the repository's dependency graph, enabling Dependabot alerts.
 
+See [examples/](examples/) for workflows that check changed formulae on tap pull requests and publish a daily scan of all of homebrew-core.
+
 ## Development
 
 ```bash
