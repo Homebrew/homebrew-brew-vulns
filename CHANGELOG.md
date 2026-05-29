@@ -1,6 +1,24 @@
 ## [Unreleased]
 
-- Set User-Agent header on OSV API requests (#49)
+## [0.3.0] - 2026-05-29
+
+- Add `--all` flag to scan every formula in homebrew-core
+- Accept one or more formula names as arguments to scan specific formulae, including ones that are not installed
+- Exit with status 2 on errors so callers can distinguish errors from "vulnerabilities found" (exit 1)
+- Add example GitHub Actions workflows for tap PR checks and full homebrew-core scans
+- Compute severity bands from CVSS vector strings when OSV data does not provide a severity label
+- Improve CVSS severity fallback handling when multiple score sources are present
+- Handle unbounded `introduced: 0` OSV ranges and multi-interval SEMVER ranges correctly
+- Fail closed (report as affected) when a version range comparison raises instead of silently skipping
+- Sanitize ANSI/terminal escape sequences, carriage returns and backspaces from text output
+- Cap concurrent requests when fetching vulnerability details to avoid unbounded thread spawning
+- Cap OSV pagination at a fixed page limit to avoid unbounded loops on bad responses
+- Set a `User-Agent` header on OSV API requests
+
+## [0.2.3] - 2026-02-05
+
+- Move repository to the Homebrew organisation and update install instructions, formula and links accordingly
+- Internal: shared CI/lint configuration sync and dependency updates
 
 ## [0.2.2] - 2026-01-25
 
