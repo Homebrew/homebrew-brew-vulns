@@ -8,15 +8,13 @@ class BrewVulns < Formula
   depends_on "ruby"
 
   def install
-    ENV["GEM_HOME"] = libexec
-
     system "git", "init"
     system "git", "add", "."
 
     system "gem", "build", "brew-vulns.gemspec"
-    system "gem", "install", "--no-document", "brew-vulns-#{version}.gem"
-    bin.install libexec/"bin/brew-vulns"
-    bin.env_script_all_files(libexec/"bin", GEM_HOME: ENV.fetch("GEM_HOME", nil))
+    system "gem", "install", "--no-document", "--install-dir", libexec,
+           "--bindir", libexec/"bin", "brew-vulns-#{version}.gem"
+
     (bin/"brew-vulns").write <<~BASH
       #!/bin/bash
       #:  * `vulns` [<formula>...] [<options>]
@@ -42,12 +40,15 @@ class BrewVulns < Formula
       #:  `-h`, `--help`
       #:    Show this help message.
 
-      GEM_HOME="#{libexec}" exec "#{libexec}/bin/brew-vulns" "$@"
+      export GEM_HOME="#{libexec}"
+      export GEM_PATH="#{libexec}"
+      exec "#{libexec}/bin/brew-vulns" "$@"
     BASH
     chmod 0755, bin/"brew-vulns"
   end
 
   test do
-    assert_match "Usage: brew vulns", shell_output("brew vulns --help")
+    assert_match(/^#:  \* `vulns`/, (bin/"brew-vulns").read)
+    assert_match "Usage: brew vulns", shell_output("#{bin}/brew-vulns --help")
   end
 end
