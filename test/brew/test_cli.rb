@@ -528,6 +528,25 @@ class TestCLI < Minitest::Test
     assert_equal "error", sarif["runs"][0]["results"][0]["level"]
   end
 
+  def test_sarif_output_with_no_vulnerabilities_includes_empty_results
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [] }] }.to_json)
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--sarif"]) }
+      Brew::Vulns::CLI.run(["--sarif"])
+    end
+
+    sarif = JSON.parse(output)
+
+    assert_equal 0, result
+    assert sarif["runs"][0].key?("results"), "SARIF run must include results key even when empty"
+    assert_equal [], sarif["runs"][0]["results"]
+  end
+
   def test_sarif_output_returns_one_with_vulnerabilities
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 

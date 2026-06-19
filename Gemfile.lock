@@ -4,7 +4,7 @@ PATH
     brew-vulns (0.3.0)
       cvss-suite (~> 4.1)
       purl (~> 1.6)
-      sarif-ruby (~> 0.1)
+      sarif-ruby (~> 0.1, >= 0.1.1)
       sbom (~> 0.4)
       vers (~> 1.0)
 
@@ -59,7 +59,7 @@ GEM
     reline (0.6.3)
       io-console (~> 0.5)
     rexml (3.4.4)
-    sarif-ruby (0.1.0)
+    sarif-ruby (0.1.1)
     sbom (0.4.1)
       json_schemer (~> 2.0)
       purl (~> 1.6)
@@ -120,7 +120,7 @@ CHECKSUMS
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb
   reline (0.6.3) sha256=1198b04973565b36ec0f11542ab3f5cfeeec34823f4e54cebde90968092b1835
   rexml (3.4.4) sha256=19e0a2c3425dfbf2d4fc1189747bdb2f849b6c5e74180401b15734bc97b5d142
-  sarif-ruby (0.1.0) sha256=8f1a5b2eac0bc1575d089e58a4d0d7ee449fbac1b01da1a7fcdcf35253183dd0
+  sarif-ruby (0.1.1) sha256=35d5a89b484954833825771f9aff650b80bc209ebc53585ba66fff4221b33225
   sbom (0.4.1) sha256=0c0cb49c43048f53c7eacaa536064704747825f3ba6b607dfe481aab9c591f37
   simplecov (0.22.0) sha256=fe2622c7834ff23b98066bb0a854284b2729a569ac659f82621fc22ef36213a5
   simplecov-html (0.13.2) sha256=bd0b8e54e7c2d7685927e8d6286466359b6f16b18cb0df47b508e8d73c777246
