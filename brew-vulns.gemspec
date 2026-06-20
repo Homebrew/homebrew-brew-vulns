@@ -31,7 +31,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "cvss-suite", "~> 4.1"
   spec.add_dependency "purl", "~> 1.6"
-  spec.add_dependency "sarif-ruby", "~> 0.1"
+  spec.add_dependency "sarif-ruby", "~> 0.1", ">= 0.1.1"
   spec.add_dependency "sbom", "~> 0.4"
   spec.add_dependency "vers", "~> 1.0"
 end
