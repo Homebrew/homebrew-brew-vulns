@@ -316,7 +316,7 @@ module Brew
 
       def output_text(results, patched, all_formulae)
         if results.empty?
-          puts "No vulnerabilities found."
+          puts patched.empty? ? "No vulnerabilities found." : "No open vulnerabilities found."
           output_patched_summary(patched)
           return 0
         end

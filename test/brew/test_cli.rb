@@ -704,7 +704,7 @@ class TestCLI < Minitest::Test
     end
 
     assert_equal 0, result
-    assert_includes output, "No vulnerabilities found."
+    assert_includes output, "No open vulnerabilities found."
     assert_includes output, "2 resolved by formula patches"
     assert_includes output, "libquicktime: CVE-2016-2399, GHSA-aaaa-bbbb-cccc"
   end
