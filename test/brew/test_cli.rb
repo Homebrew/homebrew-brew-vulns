@@ -17,6 +17,24 @@ class TestCLI < Minitest::Test
       "versions" => { "stable" => "8.5.0" },
       "urls" => { "stable" => { "url" => "https://github.com/curl/curl/archive/refs/tags/curl-8_5_0.tar.gz" } }
     }
+    @libquicktime_data = {
+      "name"     => "libquicktime",
+      "versions" => { "stable" => "1.2.4" },
+      "urls"     => {
+        "stable" => { "url" => "https://github.com/example/libquicktime/archive/refs/tags/v1.2.4.tar.gz" },
+      },
+      "patches"  => [
+        {
+          "strip"    => "p1",
+          "url"      => "https://deb.debian.org/debian/pool/main/libq/libquicktime/libquicktime_1.2.4-12.debian.tar.xz",
+          "type"     => "backport",
+          "resolves" => [
+            { "type" => "security", "id" => "CVE-2016-2399" },
+            { "type" => "security", "id" => "CVE-2017-9122" },
+          ],
+        },
+      ],
+    }
   end
 
   def test_help_flag_returns_zero
@@ -649,6 +667,165 @@ class TestCLI < Minitest::Test
 
     # SARIF may omit "note" level since it's not the default, but let's be permissive
     assert_includes ["note", nil], result["level"]
+  end
+
+  def stub_libquicktime_osv(extra_vulns: [])
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{
+          vulns: [{ "id" => "CVE-2016-2399" }, { "id" => "GHSA-aaaa-bbbb-cccc" }] + extra_vulns,
+        }],
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2016-2399")
+      .to_return(status: 200, body: {
+        "id"                => "CVE-2016-2399",
+        "summary"           => "Heap buffer overflow",
+        "database_specific" => { "severity" => "HIGH" },
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/GHSA-aaaa-bbbb-cccc")
+      .to_return(status: 200, body: {
+        "id"                => "GHSA-aaaa-bbbb-cccc",
+        "aliases"           => ["CVE-2017-9122"],
+        "summary"           => "DoS in quicktime_read_moov",
+        "database_specific" => { "severity" => "MEDIUM" },
+      }.to_json)
+  end
+
+  def test_suppresses_vulns_resolved_by_formula_patches
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run([]) }
+      Brew::Vulns::CLI.run([])
+    end
+
+    assert_equal 0, result
+    assert_includes output, "No vulnerabilities found."
+    assert_includes output, "2 resolved by formula patches"
+    assert_includes output, "libquicktime: CVE-2016-2399, GHSA-aaaa-bbbb-cccc"
+  end
+
+  def test_no_ignore_patches_flag_reports_resolved_vulns
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--no-ignore-patches"]) }
+      Brew::Vulns::CLI.run(["--no-ignore-patches"])
+    end
+
+    assert_equal 1, result
+    assert_includes output, "CVE-2016-2399 (HIGH)"
+    assert_includes output, "GHSA-aaaa-bbbb-cccc (MEDIUM)"
+    refute_includes output, "resolved by formula patches"
+  end
+
+  def test_unpatched_vuln_still_reported_alongside_patched_ones
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv(extra_vulns: [{ "id" => "CVE-2024-9999" }])
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-9999")
+      .to_return(status: 200, body: {
+        "id"                => "CVE-2024-9999",
+        "summary"           => "Unpatched issue",
+        "database_specific" => { "severity" => "CRITICAL" },
+      }.to_json)
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run([]) }
+      Brew::Vulns::CLI.run([])
+    end
+
+    assert_equal 1, result
+    assert_includes output, "CVE-2024-9999 (CRITICAL)"
+    assert_includes output, "Found 1 vulnerabilities in 1 packages"
+    assert_includes output, "2 resolved by formula patches"
+    refute_includes output, "CVE-2016-2399 (HIGH)"
+  end
+
+  def test_json_output_includes_patched_array
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--json"]) }
+      Brew::Vulns::CLI.run(["--json"])
+    end
+
+    json = JSON.parse(output)
+
+    assert_equal 0, result
+    assert_equal 1, json.size
+    assert_equal "libquicktime", json[0]["formula"]
+    assert_empty json[0]["vulnerabilities"]
+    assert_equal 2, json[0]["patched"].size
+    ids = json[0]["patched"].map { |v| v["id"] }
+    assert_includes ids, "CVE-2016-2399"
+    assert_includes ids, "GHSA-aaaa-bbbb-cccc"
+  end
+
+  def test_json_output_patched_array_empty_for_unpatched_formula
+    formulae = [Brew::Vulns::Formula.new(@vim_data)]
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: {
+        results: [{ vulns: [{ "id" => "CVE-2024-1234" }] }],
+      }.to_json)
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-1234")
+      .to_return(status: 200, body: {
+        "id"                => "CVE-2024-1234",
+        "database_specific" => { "severity" => "HIGH" },
+      }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, formulae do
+      capture_stdout { Brew::Vulns::CLI.run(["--json"]) }
+    end
+
+    json = JSON.parse(output)
+
+    assert_equal 1, json[0]["vulnerabilities"].size
+    assert_empty json[0]["patched"]
+  end
+
+  def test_cyclonedx_omits_patched_vulns
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--cyclonedx"]) }
+      Brew::Vulns::CLI.run(["--cyclonedx"])
+    end
+
+    sbom = JSON.parse(output)
+
+    assert_equal 0, result
+    assert sbom["components"].any? { |c| c["name"] == "libquicktime" }
+    assert_empty sbom["vulnerabilities"] || []
+  end
+
+  def test_sarif_omits_patched_vulns
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--sarif"]) }
+      Brew::Vulns::CLI.run(["--sarif"])
+    end
+
+    sarif = JSON.parse(output)
+
+    assert_equal 0, result
+    assert_equal [], sarif["runs"][0]["results"]
   end
 
   def test_all_flag_uses_load_all

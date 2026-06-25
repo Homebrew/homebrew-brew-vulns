@@ -147,6 +147,124 @@ class TestFormula < Minitest::Test
     assert_nil formula.to_osv_query
   end
 
+  def test_resolved_vulnerability_ids_extracts_security_ids_across_patches
+    data = {
+      "name"    => "libquicktime",
+      "patches" => [
+        {
+          "strip"    => "p1",
+          "url"      => "https://deb.debian.org/debian/pool/main/libq/libquicktime/libquicktime_1.2.4-12.debian.tar.xz",
+          "type"     => "backport",
+          "resolves" => [
+            { "type" => "security", "id" => "CVE-2016-2399" },
+            { "type" => "security", "id" => "CVE-2017-9122" },
+          ],
+        },
+        {
+          "strip"    => "p1",
+          "url"      => "https://example.com/extra.diff",
+          "resolves" => [
+            { "type" => "security", "id" => "GHSA-xr7r-f8xq-vfvv" },
+            { "type" => "security", "id" => "CVE-2017-9122" },
+          ],
+        },
+      ],
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal ["CVE-2016-2399", "CVE-2017-9122", "GHSA-XR7R-F8XQ-VFVV"], formula.resolved_vulnerability_ids
+  end
+
+  def test_resolved_vulnerability_ids_ignores_defect_resolves
+    data = {
+      "name"    => "innoextract",
+      "patches" => [
+        {
+          "strip"    => "p1",
+          "url"      => "https://github.com/dscharrer/innoextract/commit/264c2fe.patch",
+          "type"     => "backport",
+          "resolves" => [
+            { "type" => "defect", "id" => "https://github.com/dscharrer/innoextract/pull/169" },
+          ],
+        },
+      ],
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_empty formula.resolved_vulnerability_ids
+  end
+
+  def test_resolved_vulnerability_ids_empty_when_patches_missing
+    data = { "name" => "vim", "versions" => { "stable" => "9.1.0" } }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_empty formula.patches
+    assert_empty formula.resolved_vulnerability_ids
+  end
+
+  def test_resolved_vulnerability_ids_handles_patches_without_resolves
+    data = {
+      "name"    => "gecode",
+      "patches" => [
+        { "strip" => "p1", "url" => "https://github.com/Gecode/gecode/commit/c0ca0e5.patch", "type" => "cherry-pick" },
+        { "strip" => "p1", "data" => true },
+      ],
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_empty formula.resolved_vulnerability_ids
+  end
+
+  def test_resolves_matches_vulnerability_id_case_insensitively
+    data = {
+      "name"    => "glibc",
+      "patches" => [
+        { "resolves" => [{ "type" => "security", "id" => "CVE-2024-2961" }] },
+      ],
+    }
+    formula = Brew::Vulns::Formula.new(data)
+    vuln = Brew::Vulns::Vulnerability.new("id" => "cve-2024-2961")
+
+    assert formula.resolves?(vuln)
+  end
+
+  def test_resolves_matches_via_vulnerability_alias
+    data = {
+      "name"    => "glibc",
+      "patches" => [
+        { "resolves" => [{ "type" => "security", "id" => "CVE-2024-2961" }] },
+      ],
+    }
+    formula = Brew::Vulns::Formula.new(data)
+    vuln = Brew::Vulns::Vulnerability.new("id" => "GHSA-aaaa-bbbb-cccc", "aliases" => ["CVE-2024-2961"])
+
+    assert formula.resolves?(vuln)
+  end
+
+  def test_resolves_returns_false_when_no_match
+    data = {
+      "name"    => "glibc",
+      "patches" => [
+        { "resolves" => [{ "type" => "security", "id" => "CVE-2024-2961" }] },
+      ],
+    }
+    formula = Brew::Vulns::Formula.new(data)
+    vuln = Brew::Vulns::Vulnerability.new("id" => "CVE-2024-9999")
+
+    refute formula.resolves?(vuln)
+  end
+
+  def test_resolves_returns_false_when_no_patches
+    formula = Brew::Vulns::Formula.new("name" => "vim")
+    vuln = Brew::Vulns::Vulnerability.new("id" => "CVE-2024-1234")
+
+    refute formula.resolves?(vuln)
+  end
+
   def test_dependencies_list
     data = {
       "name" => "vim",

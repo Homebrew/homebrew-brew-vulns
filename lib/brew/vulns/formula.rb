@@ -6,7 +6,7 @@ require "open3"
 module Brew
   module Vulns
     class Formula
-      attr_reader :name, :version, :source_url, :head_url, :dependencies
+      attr_reader :name, :version, :source_url, :head_url, :dependencies, :patches
 
       def initialize(data)
         @name = data["name"] || data["full_name"]
@@ -14,6 +14,27 @@ module Brew
         @source_url = data.dig("urls", "stable", "url")
         @head_url = data.dig("urls", "head", "url")
         @dependencies = data["dependencies"] || []
+        @patches = data["patches"] || []
+      end
+
+      # CVE/GHSA identifiers declared as resolved by this formula's patches.
+      # Populated from `brew info --json=v2` `patches[].resolves[]` (Homebrew >= 6.0.4);
+      # empty on older Homebrew versions or for formulae with no annotated patches.
+      def resolved_vulnerability_ids
+        return @resolved_vulnerability_ids if defined?(@resolved_vulnerability_ids)
+
+        @resolved_vulnerability_ids = patches
+          .flat_map { |p| Array(p["resolves"]) }
+          .select { |r| r.is_a?(Hash) && r["type"] == "security" }
+          .map { |r| r["id"].to_s.upcase }
+          .uniq
+      end
+
+      def resolves?(vulnerability)
+        ids = resolved_vulnerability_ids
+        return false if ids.empty?
+
+        vulnerability.identifiers.any? { |id| ids.include?(id.to_s.upcase) }
       end
 
       def repo_url

@@ -17,6 +17,7 @@ module Brew
         @formula_names = parse_formula_names(args)
         @all = args.include?("--all")
         @include_deps = args.include?("--deps") || args.include?("-d")
+        @ignore_patches = !args.include?("--no-ignore-patches")
         @json_output = args.include?("--json") || args.include?("-j")
         @sarif_output = args.include?("--sarif")
         @cyclonedx_output = args.include?("--cyclonedx")
@@ -104,8 +105,8 @@ module Brew
           puts
         end
 
-        results = scan_vulnerabilities(queryable)
-        output_results(results, formulae)
+        results, patched = scan_vulnerabilities(queryable)
+        output_results(results, patched, formulae)
       rescue OsvClient::Error => e
         $stderr.puts "Error querying OSV: #{e.message}"
         2
@@ -138,6 +139,7 @@ module Brew
         vuln_results = client.query_batch(queries)
 
         results = {}
+        patched = {}
         formulae.each_with_index do |formula, idx|
           batch_vulns = vuln_results[idx] || []
           next if batch_vulns.empty?
@@ -155,40 +157,49 @@ module Brew
           vulns = vulns.select { |v| v.affects_version?(version) }
           vulns = vulns.select { |v| v.severity_level >= @min_severity } if @min_severity > 0
 
+          if @ignore_patches
+            resolved, vulns = vulns.partition { |v| formula.resolves?(v) }
+            patched[formula] = resolved if resolved.any?
+          end
+
           results[formula] = vulns if vulns.any?
         end
 
-        results
+        [results, patched]
       end
 
-      def output_results(results, all_formulae)
+      def output_results(results, patched, all_formulae)
         if @cyclonedx_output
           output_cyclonedx(results, all_formulae)
         elsif @sarif_output
           output_sarif(results)
         elsif @json_output
-          output_json(results)
+          output_json(results, patched)
         else
-          output_text(results, all_formulae)
+          output_text(results, patched, all_formulae)
         end
       end
 
-      def output_json(results)
-        data = results.map do |formula, vulns|
+      def vuln_json(vuln)
+        {
+          id:             vuln.id,
+          severity:       vuln.severity_display,
+          summary:        vuln.summary,
+          aliases:        vuln.aliases,
+          fixed_versions: vuln.fixed_versions,
+        }
+      end
+
+      def output_json(results, patched)
+        formulae = (results.keys + patched.keys).uniq
+        data = formulae.map do |formula|
           {
-            formula: formula.name,
-            version: formula.version,
-            tag: formula.tag,
-            repo_url: formula.repo_url,
-            vulnerabilities: vulns.map do |v|
-              {
-                id: v.id,
-                severity: v.severity_display,
-                summary: v.summary,
-                aliases: v.aliases,
-                fixed_versions: v.fixed_versions
-              }
-            end
+            formula:         formula.name,
+            version:         formula.version,
+            tag:             formula.tag,
+            repo_url:        formula.repo_url,
+            vulnerabilities: (results[formula] || []).map { |v| vuln_json(v) },
+            patched:         (patched[formula] || []).map { |v| vuln_json(v) },
           }
         end
 
@@ -199,30 +210,33 @@ module Brew
       def output_cyclonedx(results, all_formulae)
         components = all_formulae.map do |formula|
           {
-            type: "library",
-            name: formula.name,
+            type:    "library",
+            name:    formula.name,
             version: formula.version,
-            purl: "pkg:brew/#{formula.name}@#{formula.version}"
+            purl:    "pkg:brew/#{formula.name}@#{formula.version}",
           }
         end
 
+        # Vulnerabilities resolved by formula patches are omitted. CycloneDX models this via
+        # `analysis.state = resolved` (and `pedigree.patches` on the component), but the `sbom`
+        # gem does not yet pass either through, so emitting them would look like open findings.
         vulnerabilities = []
         results.each do |formula, vulns|
           vulns.each do |vuln|
             vulnerabilities << {
-              id: vuln.id,
-              source: { name: "OSV", url: "https://osv.dev" },
-              ratings: [{ severity: vuln.severity_display&.downcase }],
+              id:          vuln.id,
+              source:      { name: "OSV", url: "https://osv.dev" },
+              ratings:     [{ severity: vuln.severity_display&.downcase }],
               description: vuln.summary,
-              affects: [{ ref: "pkg:brew/#{formula.name}@#{formula.version}" }]
+              affects:     [{ ref: "pkg:brew/#{formula.name}@#{formula.version}" }],
             }
           end
         end
 
         generator = Sbom::Cyclonedx::Generator.new(format: :json)
         generator.generate("brew-vulns", {
-          packages: components,
-          vulnerabilities: vulnerabilities
+          packages:        components,
+          vulnerabilities: vulnerabilities,
         })
 
         puts generator.output
@@ -300,9 +314,10 @@ module Brew
         end
       end
 
-      def output_text(results, all_formulae)
+      def output_text(results, patched, all_formulae)
         if results.empty?
           puts "No vulnerabilities found."
+          output_patched_summary(patched)
           return 0
         end
 
@@ -336,7 +351,20 @@ module Brew
         end
 
         puts "Found #{total_vulns} vulnerabilities in #{results.size} packages"
+        output_patched_summary(patched)
         1
+      end
+
+      def output_patched_summary(patched)
+        return if patched.empty?
+
+        total = patched.values.sum(&:size)
+        puts
+        puts "#{total} resolved by formula patches (not counted; pass --no-ignore-patches to include):"
+        patched.sort_by { |f, _| f.name }.each do |formula, vulns|
+          ids = vulns.map { |v| sanitize_terminal_escapes(v.id) }.join(", ")
+          puts "  #{sanitize_terminal_escapes(formula.name)}: #{ids}"
+        end
       end
 
       def sanitize_terminal_escapes(text)
@@ -373,6 +401,7 @@ module Brew
             --all                Scan every formula in homebrew-core
             -b, --brewfile PATH  Scan packages from a Brewfile (default: ./Brewfile)
             -d, --deps           Include dependencies when checking a specific formula or Brewfile
+            --no-ignore-patches  Report vulnerabilities even when the formula applies a patch that resolves them
             -j, --json           Output results as JSON
             --cyclonedx          Output results as CycloneDX SBOM with vulnerabilities
             --sarif              Output results as SARIF for GitHub code scanning

@@ -31,6 +31,7 @@ brew vulns [formula...] [options]
 | | `--all` | Scan every formula in homebrew-core |
 | `-b PATH` | `--brewfile PATH` | Scan packages from a Brewfile (default: ./Brewfile) |
 | `-d` | `--deps` | Include dependencies when checking a specific formula or Brewfile |
+| | `--no-ignore-patches` | Report vulnerabilities even when the formula applies a patch that resolves them |
 | `-j` | `--json` | Output results as JSON |
 | | `--cyclonedx` | Output results as CycloneDX SBOM with vulnerabilities |
 | | `--sarif` | Output results as SARIF for GitHub code scanning |
@@ -95,6 +96,12 @@ brew vulns --help
 4. Reports any vulnerabilities found with their severity and CVE identifiers
 
 Packages with GitHub, GitLab, or Codeberg source URLs are checked. Packages from other sources are skipped.
+
+### Patched vulnerabilities
+
+Some Homebrew formulae apply patches that fix CVEs without changing the upstream version number. Where a formula's `patch` block declares (or infers) a `resolves` entry for a CVE or GHSA identifier, `brew vulns` treats matching OSV results as already resolved: they are listed separately in text and `--json` output, omitted from `--sarif` and `--cyclonedx` output, and do not affect the exit code. Pass `--no-ignore-patches` to report them as open findings instead.
+
+This relies on `patches[].resolves` data in `brew info --json=v2`, available from Homebrew 6.0.4 onwards. With an older Homebrew, or for formulae whose patches are not yet annotated, no suppression happens.
 
 ## Example output
 
