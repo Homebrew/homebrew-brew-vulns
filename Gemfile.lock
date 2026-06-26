@@ -5,7 +5,7 @@ PATH
       cvss-suite (~> 4.1)
       purl (~> 1.6)
       sarif-ruby (~> 0.1, >= 0.1.1)
-      sbom (~> 0.4)
+      sbom (~> 0.5)
       vers (~> 1.0)
 
 GEM
@@ -60,7 +60,7 @@ GEM
       io-console (~> 0.5)
     rexml (3.4.4)
     sarif-ruby (0.1.1)
-    sbom (0.4.1)
+    sbom (0.5.0)
       json_schemer (~> 2.0)
       purl (~> 1.6)
       rexml (~> 3.2)
@@ -121,7 +121,7 @@ CHECKSUMS
   reline (0.6.3) sha256=1198b04973565b36ec0f11542ab3f5cfeeec34823f4e54cebde90968092b1835
   rexml (3.4.4) sha256=19e0a2c3425dfbf2d4fc1189747bdb2f849b6c5e74180401b15734bc97b5d142
   sarif-ruby (0.1.1) sha256=35d5a89b484954833825771f9aff650b80bc209ebc53585ba66fff4221b33225
-  sbom (0.4.1) sha256=0c0cb49c43048f53c7eacaa536064704747825f3ba6b607dfe481aab9c591f37
+  sbom (0.5.0) sha256=272ee86d6696bc4078d14f50ba7183aadcaa3d6726af9a3d247fdc36c5a89e1e
   simplecov (0.22.0) sha256=fe2622c7834ff23b98066bb0a854284b2729a569ac659f82621fc22ef36213a5
   simplecov-html (0.13.2) sha256=bd0b8e54e7c2d7685927e8d6286466359b6f16b18cb0df47b508e8d73c777246
   simplecov_json_formatter (0.1.4) sha256=529418fbe8de1713ac2b2d612aa3daa56d316975d307244399fa4838c601b428

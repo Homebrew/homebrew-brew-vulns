@@ -99,7 +99,7 @@ Packages with GitHub, GitLab, or Codeberg source URLs are checked. Packages from
 
 ### Patched vulnerabilities
 
-Some Homebrew formulae apply patches that fix CVEs without changing the upstream version number. Where a formula's `patch` block declares (or infers) a `resolves` entry for a CVE or GHSA identifier, `brew vulns` treats matching OSV results as already resolved: they are listed separately in text and `--json` output, omitted from `--sarif` and `--cyclonedx` output, and do not affect the exit code. Pass `--no-ignore-patches` to report them as open findings instead.
+Some Homebrew formulae apply patches that fix CVEs without changing the upstream version number. Where a formula's `patch` block declares (or infers) a `resolves` entry for a CVE or GHSA identifier, `brew vulns` treats matching OSV results as already resolved: they are listed separately in text and `--json` output, omitted from `--sarif` output, emitted in `--cyclonedx` output with `analysis.state` set to `resolved`, and do not affect the exit code. The CycloneDX SBOM also records each formula's patches under `components[].pedigree.patches`. Pass `--no-ignore-patches` to report them as open findings instead.
 
 This relies on `patches[].resolves` data in `brew info --json=v2`, available from Homebrew 6.0.4 onwards. With an older Homebrew, or for formulae whose patches are not yet annotated, no suppression happens.
 

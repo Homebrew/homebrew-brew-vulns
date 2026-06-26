@@ -795,7 +795,7 @@ class TestCLI < Minitest::Test
     assert_empty json[0]["patched"]
   end
 
-  def test_cyclonedx_omits_patched_vulns
+  def test_cyclonedx_marks_patched_vulns_as_resolved
     formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
     stub_libquicktime_osv
 
@@ -808,8 +808,59 @@ class TestCLI < Minitest::Test
     sbom = JSON.parse(output)
 
     assert_equal 0, result
-    assert sbom["components"].any? { |c| c["name"] == "libquicktime" }
-    assert_empty sbom["vulnerabilities"] || []
+
+    component = sbom["components"].find { |c| c["name"] == "libquicktime" }
+    patches = component["pedigree"]["patches"]
+
+    assert_equal 1, patches.size
+    assert_equal "backport", patches[0]["type"]
+    assert_equal "https://deb.debian.org/debian/pool/main/libq/libquicktime/libquicktime_1.2.4-12.debian.tar.xz",
+                 patches[0]["diff"]["url"]
+    resolved_ids = patches[0]["resolves"].map { |r| r["id"] }
+
+    assert_includes resolved_ids, "CVE-2016-2399"
+    assert_includes resolved_ids, "CVE-2017-9122"
+
+    vulns = sbom["vulnerabilities"]
+
+    assert_equal 2, vulns.size
+    vulns.each do |v|
+      assert_equal "resolved", v["analysis"]["state"]
+      assert_equal ["update"], v["analysis"]["response"]
+      assert_match(/Resolved by Homebrew formula patch/, v["analysis"]["detail"])
+    end
+
+    ghsa = vulns.find { |v| v["id"] == "GHSA-aaaa-bbbb-cccc" }
+
+    assert_match(/CVE-2017-9122/, ghsa["analysis"]["detail"])
+  end
+
+  def test_cyclonedx_open_vulns_have_no_analysis
+    formulae = [Brew::Vulns::Formula.new(@libquicktime_data)]
+    stub_libquicktime_osv(extra_vulns: [{ "id" => "CVE-2099-9999" }])
+
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2099-9999")
+      .to_return(status: 200, body: {
+        "id"                => "CVE-2099-9999",
+        "summary"           => "Unpatched issue",
+        "database_specific" => { "severity" => "HIGH" },
+      }.to_json)
+
+    output = nil
+    result = Brew::Vulns::Formula.stub :load_installed, formulae do
+      output = capture_stdout { Brew::Vulns::CLI.run(["--cyclonedx"]) }
+      Brew::Vulns::CLI.run(["--cyclonedx"])
+    end
+
+    sbom = JSON.parse(output)
+
+    assert_equal 1, result
+
+    open_vuln = sbom["vulnerabilities"].find { |v| v["id"] == "CVE-2099-9999" }
+    resolved = sbom["vulnerabilities"].find { |v| v["id"] == "CVE-2016-2399" }
+
+    refute open_vuln.key?("analysis")
+    assert_equal "resolved", resolved["analysis"]["state"]
   end
 
   def test_sarif_omits_patched_vulns

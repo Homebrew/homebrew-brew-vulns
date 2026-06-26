@@ -37,6 +37,34 @@ module Brew
         vulnerability.identifiers.any? { |id| ids.include?(id.to_s.upcase) }
       end
 
+      CYCLONEDX_PATCH_TYPES = {
+        "backport"    => "backport",
+        "cherry_pick" => "cherry-pick",
+        "unofficial"  => "unofficial",
+      }.freeze
+
+      # Maps `brew info --json=v2` patch data to a CycloneDX `pedigree` hash
+      # (symbol-keyed for the `sbom` gem). Returns nil when there are no patches.
+      def cyclonedx_pedigree
+        return nil if patches.empty?
+
+        cdx_patches = patches.map do |p|
+          patch = { type: CYCLONEDX_PATCH_TYPES.fetch(p["type"].to_s, "unofficial") }
+          patch[:diff] = { url: p["url"] } if p["url"]
+
+          resolves = Array(p["resolves"]).filter_map do |r|
+            next unless r.is_a?(Hash) && r["type"] && r["id"]
+
+            { type: r["type"], id: r["id"] }
+          end
+          patch[:resolves] = resolves if resolves.any?
+
+          patch
+        end
+
+        { patches: cdx_patches }
+      end
+
       def repo_url
         return @repo_url if defined?(@repo_url)
 

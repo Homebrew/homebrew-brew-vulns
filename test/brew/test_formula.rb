@@ -265,6 +265,47 @@ class TestFormula < Minitest::Test
     refute formula.resolves?(vuln)
   end
 
+  def test_cyclonedx_pedigree_maps_patch_data
+    formula = Brew::Vulns::Formula.new(
+      "name"    => "x",
+      "patches" => [
+        {
+          "url"      => "https://example.com/a.patch",
+          "type"     => "cherry_pick",
+          "resolves" => [
+            { "type" => "security", "id" => "CVE-1" },
+            { "type" => "defect", "id" => "BUG-2" },
+          ],
+        },
+        { "type" => "backport" },
+        { "url" => "https://example.com/c.patch" },
+      ],
+    )
+
+    pedigree = formula.cyclonedx_pedigree
+
+    assert_equal 3, pedigree[:patches].size
+
+    p1 = pedigree[:patches][0]
+
+    assert_equal "cherry-pick", p1[:type]
+    assert_equal "https://example.com/a.patch", p1[:diff][:url]
+    assert_equal [{ type: "security", id: "CVE-1" }, { type: "defect", id: "BUG-2" }], p1[:resolves]
+
+    p2 = pedigree[:patches][1]
+
+    assert_equal "backport", p2[:type]
+    refute p2.key?(:diff)
+    refute p2.key?(:resolves)
+
+    assert_equal "unofficial", pedigree[:patches][2][:type]
+  end
+
+  def test_cyclonedx_pedigree_nil_when_no_patches
+    assert_nil Brew::Vulns::Formula.new("name" => "x").cyclonedx_pedigree
+    assert_nil Brew::Vulns::Formula.new("name" => "x", "patches" => []).cyclonedx_pedigree
+  end
+
   def test_dependencies_list
     data = {
       "name" => "vim",

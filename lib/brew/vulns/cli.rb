@@ -170,7 +170,7 @@ module Brew
 
       def output_results(results, patched, all_formulae)
         if @cyclonedx_output
-          output_cyclonedx(results, all_formulae)
+          output_cyclonedx(results, patched, all_formulae)
         elsif @sarif_output
           output_sarif(results)
         elsif @json_output
@@ -207,29 +207,35 @@ module Brew
         results.empty? ? 0 : 1
       end
 
-      def output_cyclonedx(results, all_formulae)
+      def output_cyclonedx(results, patched, all_formulae)
         components = all_formulae.map do |formula|
-          {
+          component = {
             type:    "library",
             name:    formula.name,
             version: formula.version,
             purl:    "pkg:brew/#{formula.name}@#{formula.version}",
           }
+          pedigree = formula.cyclonedx_pedigree
+          component[:pedigree] = pedigree if pedigree
+          component
         end
 
-        # Vulnerabilities resolved by formula patches are omitted. CycloneDX models this via
-        # `analysis.state = resolved` (and `pedigree.patches` on the component), but the `sbom`
-        # gem does not yet pass either through, so emitting them would look like open findings.
         vulnerabilities = []
         results.each do |formula, vulns|
           vulns.each do |vuln|
-            vulnerabilities << {
-              id:          vuln.id,
-              source:      { name: "OSV", url: "https://osv.dev" },
-              ratings:     [{ severity: vuln.severity_display&.downcase }],
-              description: vuln.summary,
-              affects:     [{ ref: "pkg:brew/#{formula.name}@#{formula.version}" }],
-            }
+            vulnerabilities << cyclonedx_vulnerability(formula, vuln)
+          end
+        end
+        patched.each do |formula, vulns|
+          vulns.each do |vuln|
+            matched = (formula.resolved_vulnerability_ids & vuln.identifiers.map { |i| i.to_s.upcase }).join(", ")
+            vulnerabilities << cyclonedx_vulnerability(formula, vuln).merge(
+              analysis: {
+                state:    "resolved",
+                response: ["update"],
+                detail:   "Resolved by Homebrew formula patch (#{matched}).",
+              },
+            )
           end
         end
 
@@ -241,6 +247,16 @@ module Brew
 
         puts generator.output
         results.empty? ? 0 : 1
+      end
+
+      def cyclonedx_vulnerability(formula, vuln)
+        {
+          id:          vuln.id,
+          source:      { name: "OSV", url: "https://osv.dev" },
+          ratings:     [{ severity: vuln.severity_display&.downcase }],
+          description: vuln.summary,
+          affects:     [{ ref: "pkg:brew/#{formula.name}@#{formula.version}" }],
+        }
       end
 
       def output_sarif(results)
