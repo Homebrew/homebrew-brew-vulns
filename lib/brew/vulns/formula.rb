@@ -69,10 +69,13 @@ module Brew
 
       # The git repository URL to use as the OSV `GIT` ecosystem package name.
       # In order of preference:
-      #   1. owner/repo extracted from a recognised forge tarball URL (stable, then head)
+      #   1. owner/repo extracted from a recognised forge URL on stable, then head.
+      #      Known forges are preferred even when head is a mirror of a non-forge
+      #      stable repo, because OSV's GIT coverage is much better for them.
       #   2. the stable URL itself when stable is a git checkout (`url ..., tag: ...`)
       #   3. the head URL verbatim (head specs are always git URLs)
-      # Returns nil for formulae with neither a forge tarball nor a head spec.
+      # Returns nil for formulae with no recognised forge URL, no `tag:` stable
+      # spec and no head spec.
       def repo_url
         return @repo_url if defined?(@repo_url)
 

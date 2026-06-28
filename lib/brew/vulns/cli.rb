@@ -101,7 +101,7 @@ module Brew
 
         unless @json_output || @sarif_output || @cyclonedx_output
           puts "Checking #{queryable.size} packages for vulnerabilities..."
-          puts "(#{skipped} packages skipped - no source repository URL)" if skipped > 0
+          puts "(#{skipped} packages skipped - no source repository URL or version)" if skipped > 0
           puts
         end
 
