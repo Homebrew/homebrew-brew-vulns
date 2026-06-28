@@ -18,7 +18,6 @@ class TestFormula < Minitest::Test
 
     assert_equal "https://github.com/nektos/act", formula.repo_url
     assert_equal "v0.2.84", formula.tag
-    assert formula.github?
   end
 
   def test_extracts_tag_without_v_prefix
@@ -66,20 +65,19 @@ class TestFormula < Minitest::Test
     assert_equal "https://github.com/AomediaOrg/aom", formula.repo_url
   end
 
-  def test_returns_nil_for_unsupported_urls
+  def test_repo_url_nil_for_non_forge_tarball_without_head
     data = {
-      "name" => "example",
-      "versions" => { "stable" => "1.0.0" },
+      "name" => "libquicktime",
+      "versions" => { "stable" => "1.2.4" },
       "urls" => {
-        "stable" => { "url" => "https://example.com/source.tar.gz" }
+        "stable" => { "url" => "https://downloads.sourceforge.net/project/libquicktime/libquicktime/1.2.4/libquicktime-1.2.4.tar.gz" }
       }
     }
 
     formula = Brew::Vulns::Formula.new(data)
 
     assert_nil formula.repo_url
-    refute formula.github?
-    refute formula.supported_forge?
+    assert_nil formula.to_osv_query
   end
 
   def test_extracts_repo_url_from_gitlab_archive_url
@@ -94,9 +92,6 @@ class TestFormula < Minitest::Test
     formula = Brew::Vulns::Formula.new(data)
 
     assert_equal "https://gitlab.com/owner/repo", formula.repo_url
-    assert formula.gitlab?
-    assert formula.supported_forge?
-    refute formula.github?
   end
 
   def test_extracts_repo_url_from_codeberg_archive_url
@@ -111,9 +106,56 @@ class TestFormula < Minitest::Test
     formula = Brew::Vulns::Formula.new(data)
 
     assert_equal "https://codeberg.org/owner/repo", formula.repo_url
-    assert formula.codeberg?
-    assert formula.supported_forge?
-    refute formula.github?
+  end
+
+  def test_uses_stable_git_url_and_tag_for_non_forge_host
+    data = {
+      "name" => "aom",
+      "versions" => { "stable" => "3.14.1" },
+      "urls" => {
+        "stable" => { "url" => "https://aomedia.googlesource.com/aom.git", "tag" => "v3.14.1" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://aomedia.googlesource.com/aom.git", formula.repo_url
+    assert_equal "v3.14.1", formula.tag
+    assert_equal({ repo_url: "https://aomedia.googlesource.com/aom.git", version: "v3.14.1", name: "aom" },
+                 formula.to_osv_query)
+  end
+
+  def test_prefers_explicit_stable_tag_over_url_parsing
+    data = {
+      "name" => "argo",
+      "versions" => { "stable" => "4.0.6" },
+      "urls" => {
+        "stable" => { "url" => "https://github.com/argoproj/argo-workflows.git", "tag" => "v4.0.6" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://github.com/argoproj/argo-workflows", formula.repo_url
+    assert_equal "v4.0.6", formula.tag
+  end
+
+  def test_falls_back_to_head_url_and_version_for_non_forge_tarball
+    data = {
+      "name" => "coreutils",
+      "versions" => { "stable" => "9.11" },
+      "urls" => {
+        "stable" => { "url" => "https://ftpmirror.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz" },
+        "head" => { "url" => "https://git.savannah.gnu.org/git/coreutils.git" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://git.savannah.gnu.org/git/coreutils.git", formula.repo_url
+    assert_equal "9.11", formula.tag
+    assert_equal({ repo_url: "https://git.savannah.gnu.org/git/coreutils.git", version: "9.11", name: "coreutils" },
+                 formula.to_osv_query)
   end
 
   def test_to_osv_query_returns_hash_with_required_fields
@@ -133,17 +175,18 @@ class TestFormula < Minitest::Test
     assert_equal "vim", query[:name]
   end
 
-  def test_to_osv_query_returns_nil_when_no_repo_url
+  def test_to_osv_query_returns_nil_when_head_url_but_no_version
     data = {
       "name" => "example",
-      "versions" => { "stable" => "1.0.0" },
       "urls" => {
-        "stable" => { "url" => "https://example.com/source.tar.gz" }
+        "head" => { "url" => "https://git.example.com/repo.git" }
       }
     }
 
     formula = Brew::Vulns::Formula.new(data)
 
+    assert_equal "https://git.example.com/repo.git", formula.repo_url
+    assert_nil formula.tag
     assert_nil formula.to_osv_query
   end
 

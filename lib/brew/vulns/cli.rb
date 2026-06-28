@@ -96,12 +96,12 @@ module Brew
           return 0
         end
 
-        queryable = formulae.select(&:supported_forge?).select(&:tag)
+        queryable = formulae.select(&:to_osv_query)
         skipped = formulae.size - queryable.size
 
         unless @json_output || @sarif_output || @cyclonedx_output
           puts "Checking #{queryable.size} packages for vulnerabilities..."
-          puts "(#{skipped} packages skipped - no supported source URL)" if skipped > 0
+          puts "(#{skipped} packages skipped - no source repository URL)" if skipped > 0
           puts
         end
 
