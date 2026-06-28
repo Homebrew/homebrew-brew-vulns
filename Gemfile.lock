@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    brew-vulns (0.3.0)
+    brew-vulns (0.4.0)
       cvss-suite (~> 4.1)
       purl (~> 1.6)
       sarif-ruby (~> 0.1, >= 0.1.1)
@@ -95,7 +95,7 @@ DEPENDENCIES
 CHECKSUMS
   addressable (2.9.0) sha256=7fdf6ac3660f7f4e867a0838be3f6cf722ace541dd97767fa42bc6cfa980c7af
   bigdecimal (3.3.1) sha256=eaa01e228be54c4f9f53bf3cc34fe3d5e845c31963e7fcc5bedb05a4e7d52218
-  brew-vulns (0.3.0)
+  brew-vulns (0.4.0)
   crack (1.0.1) sha256=ff4a10390cd31d66440b7524eb1841874db86201d5b70032028553130b6d4c7e
   cvss-suite (4.1.3) sha256=625cdebdf2a1a940450d11bb8c8637b96c7004fb48559d59700079ca7a6f875c
   date (3.5.1) sha256=750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0
