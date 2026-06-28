@@ -6,7 +6,7 @@ require "open3"
 module Brew
   module Vulns
     class Formula
-      attr_reader :name, :version, :source_url, :head_url, :dependencies
+      attr_reader :name, :version, :source_url, :head_url, :dependencies, :patches
 
       def initialize(data)
         @name = data["name"] || data["full_name"]
@@ -14,6 +14,56 @@ module Brew
         @source_url = data.dig("urls", "stable", "url")
         @head_url = data.dig("urls", "head", "url")
         @dependencies = data["dependencies"] || []
+        @patches = data["patches"] || []
+      end
+
+      # CVE/GHSA identifiers declared as resolved by this formula's patches.
+      # Populated from `brew info --json=v2` `patches[].resolves[]` (Homebrew >= 6.0.4);
+      # empty on older Homebrew versions or for formulae with no annotated patches.
+      def resolved_vulnerability_ids
+        return @resolved_vulnerability_ids if defined?(@resolved_vulnerability_ids)
+
+        @resolved_vulnerability_ids = patches
+          .flat_map { |p| Array(p["resolves"]) }
+          .select { |r| r.is_a?(Hash) && r["type"] == "security" }
+          .map { |r| r["id"].to_s.upcase }
+          .reject(&:empty?)
+          .uniq
+      end
+
+      def resolves?(vulnerability)
+        ids = resolved_vulnerability_ids
+        return false if ids.empty?
+
+        vulnerability.identifiers.any? { |id| ids.include?(id.to_s.upcase) }
+      end
+
+      CYCLONEDX_PATCH_TYPES = {
+        "backport"    => "backport",
+        "cherry_pick" => "cherry-pick",
+        "unofficial"  => "unofficial",
+      }.freeze
+
+      # Maps `brew info --json=v2` patch data to a CycloneDX `pedigree` hash
+      # (symbol-keyed for the `sbom` gem). Returns nil when there are no patches.
+      def cyclonedx_pedigree
+        return nil if patches.empty?
+
+        cdx_patches = patches.map do |p|
+          patch = { type: CYCLONEDX_PATCH_TYPES.fetch(p["type"].to_s, "unofficial") }
+          patch[:diff] = { url: p["url"] } if p["url"]
+
+          resolves = Array(p["resolves"]).filter_map do |r|
+            next unless r.is_a?(Hash) && r["type"] && r["id"]
+
+            { type: r["type"], id: r["id"] }
+          end
+          patch[:resolves] = resolves if resolves.any?
+
+          patch
+        end
+
+        { patches: cdx_patches }
       end
 
       def repo_url
