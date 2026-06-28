@@ -10,7 +10,7 @@ module Brew
       DEFAULT_MAX_SUMMARY = 60
       SEVERITY_LEVELS = { "low" => 1, "medium" => 2, "high" => 3, "critical" => 4 }.freeze
       MAX_VULN_FETCH_THREADS = 15
-      FLAGS_WITH_VALUE = %w[-b --brewfile -m --max-summary -s --severity].freeze
+      FLAGS_WITH_VALUE = %w[-b --brewfile -m --max-summary -s --severity --osv-export].freeze
 
       def initialize(args)
         @args = args
@@ -25,6 +25,7 @@ module Brew
         @max_summary = parse_max_summary(args)
         @min_severity = parse_severity(args)
         @brewfile = parse_brewfile_path(args)
+        @osv_export_dir = parse_osv_export_dir(args)
       end
 
       def parse_formula_names(args)
@@ -71,6 +72,19 @@ module Brew
         0
       end
 
+      def parse_osv_export_dir(args)
+        args.each_with_index do |arg, idx|
+          if arg == "--osv-export"
+            value = args[idx + 1]
+            return value if value && !value.start_with?("-")
+            return "osv-export"
+          elsif arg.start_with?("--osv-export=")
+            return arg.split("=", 2).last
+          end
+        end
+        nil
+      end
+
       def parse_brewfile_path(args)
         args.each_with_index do |arg, idx|
           if arg == "--brewfile" || arg == "-b"
@@ -89,6 +103,8 @@ module Brew
           print_help
           return 0
         end
+
+        return run_osv_export if @osv_export_dir
 
         formulae = load_formulae
         if formulae.empty?
@@ -115,6 +131,25 @@ module Brew
         2
       rescue JSON::ParserError => e
         $stderr.puts "Error parsing brew output: #{e.message}"
+        2
+      end
+
+      def run_osv_export
+        formulae = if @formula_names.any?
+          Formula.load_named(@formula_names)
+        else
+          Formula.load_all
+        end
+
+        annotated = formulae.select { |f| f.resolved_vulnerability_ids.any? }
+        $stderr.puts "#{annotated.size} formulae with security `resolves` annotations"
+
+        written = OsvExport.run(annotated, @osv_export_dir)
+        written.each { |p| $stderr.puts "  wrote #{p}" }
+        $stderr.puts "#{written.size} records written to #{@osv_export_dir}"
+        0
+      rescue Error => e
+        $stderr.puts "Error: #{e.message}"
         2
       end
 
@@ -421,6 +456,7 @@ module Brew
             -j, --json           Output results as JSON
             --cyclonedx          Output results as CycloneDX SBOM with vulnerabilities
             --sarif              Output results as SARIF for GitHub code scanning
+            --osv-export DIR     Write OSV-schema records for patch-resolved CVEs to DIR (experimental)
             -m, --max-summary N  Truncate summaries to N characters (default: 60, 0 for no limit)
             -s, --severity LEVEL Only show vulnerabilities at or above LEVEL (low, medium, high, critical)
             -h, --help           Show this help message
@@ -438,6 +474,7 @@ module Brew
             brew vulns --cyclonedx        Output as CycloneDX SBOM
             brew vulns --sarif            Output as SARIF for GitHub Actions
             brew vulns --severity high    Only show HIGH and CRITICAL vulnerabilities
+            brew vulns --osv-export ./advisories  Generate Homebrew-ecosystem OSV records
         HELP
       end
     end

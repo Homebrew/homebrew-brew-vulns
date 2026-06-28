@@ -7,6 +7,7 @@ require_relative "vulns/version"
 require_relative "vulns/osv_client"
 require_relative "vulns/formula"
 require_relative "vulns/vulnerability"
+require_relative "vulns/osv_export"
 require_relative "vulns/cli"
 
 module Brew

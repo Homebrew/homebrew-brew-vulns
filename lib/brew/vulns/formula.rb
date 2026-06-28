@@ -7,11 +7,12 @@ require "purl"
 module Brew
   module Vulns
     class Formula
-      attr_reader :name, :version, :source_url, :head_url, :homepage, :dependencies, :patches
+      attr_reader :name, :version, :revision, :source_url, :head_url, :homepage, :dependencies, :patches
 
       def initialize(data)
         @name = data["name"] || data["full_name"]
         @version = data.dig("versions", "stable") || data["version"]
+        @revision = data["revision"].to_i
         @source_url = data.dig("urls", "stable", "url")
         @stable_tag = data.dig("urls", "stable", "tag")
         @head_url = data.dig("urls", "head", "url")
@@ -20,12 +21,26 @@ module Brew
         @patches = data["patches"] || []
       end
 
+      # The Homebrew package version including the revision suffix, e.g. "1.81.6_6".
+      # This is the version string as it appears in `pkg:brew/` purls and bottle paths.
+      def full_version
+        revision.zero? ? version : "#{version}_#{revision}"
+      end
+
       # Package URL for this formula. Uses the `purl` gem so that special
       # characters in the formula name (notably `@` in versioned formulae like
       # `glibc@2.13`) are percent-encoded; otherwise the `@` would be parsed as
       # the version separator.
       def purl(with_version: true)
         Purl::PackageURL.new(type: "brew", name: name, version: with_version ? version : nil).to_s
+      end
+
+      # Patches whose `resolves` list contains `vuln_id` (case-insensitive).
+      def patches_resolving(vuln_id)
+        target = vuln_id.to_s.upcase
+        patches.select do |p|
+          Array(p["resolves"]).any? { |r| r.is_a?(Hash) && r["type"] == "security" && r["id"].to_s.upcase == target }
+        end
       end
 
       # CVE/GHSA identifiers declared as resolved by this formula's patches.
