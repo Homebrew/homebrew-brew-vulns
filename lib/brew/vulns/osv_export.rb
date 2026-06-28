@@ -84,7 +84,7 @@ module Brew
           ],
           ecosystem_specific: {
             fix:     "patch",
-            patches: formula.patches_resolving(vuln_id).map { |p| patch_ref(p) },
+            patches: formula.patches_resolving(vuln_id).filter_map { |p| patch_ref(p) },
           },
         }
       end
@@ -93,8 +93,10 @@ module Brew
         ref = {}
         ref[:type] = patch["type"] if patch["type"]
         ref[:url] = patch["url"] if patch["url"]
+        ref[:file] = patch["file"] if patch["file"]
         ref[:apply] = patch["apply"] if patch["apply"]
-        ref
+        ref[:data] = true if patch["data"]
+        ref.empty? ? nil : ref
       end
 
       def fetch_upstream(client, vuln_id)

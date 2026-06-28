@@ -5,6 +5,9 @@ module Brew
     class CLI
       def self.run(args)
         new(args).run
+      rescue Error => e
+        $stderr.puts "Error: #{e.message}"
+        2
       end
 
       DEFAULT_MAX_SUMMARY = 60
@@ -76,10 +79,14 @@ module Brew
         args.each_with_index do |arg, idx|
           if arg == "--osv-export"
             value = args[idx + 1]
-            return value if value && !value.start_with?("-")
-            return "osv-export"
+            return value if value && !value.empty? && !value.start_with?("-")
+
+            raise Error, "--osv-export requires a directory argument"
           elsif arg.start_with?("--osv-export=")
-            return arg.split("=", 2).last
+            value = arg.split("=", 2).last
+            raise Error, "--osv-export requires a directory argument" if value.empty?
+
+            return value
           end
         end
         nil
@@ -134,6 +141,9 @@ module Brew
         2
       end
 
+      # OSV export always operates on the full homebrew-core set (it generates
+      # an ecosystem-wide advisory feed), or on explicitly named formulae for
+      # testing. --brewfile / installed selection are intentionally ignored.
       def run_osv_export
         formulae = if @formula_names.any?
           Formula.load_named(@formula_names)

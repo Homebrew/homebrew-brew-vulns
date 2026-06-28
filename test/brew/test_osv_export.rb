@@ -49,6 +49,23 @@ class TestOsvExport < Minitest::Test
     assert_equal({ fixed: "1.81.6_6" }, events[1])
   end
 
+  def test_patch_ref_includes_file_and_data_and_drops_empty
+    formula = Brew::Vulns::Formula.new(
+      "name"     => "x",
+      "versions" => { "stable" => "1.0" },
+      "patches"  => [
+        { "file" => "Patches/x/fix.patch", "resolves" => [{ "type" => "security", "id" => "CVE-1" }] },
+        { "data" => true, "resolves" => [{ "type" => "security", "id" => "CVE-1" }] },
+        { "resolves" => [{ "type" => "security", "id" => "CVE-1" }] },
+      ],
+    )
+
+    patches = Brew::Vulns::OsvExport.record_for(formula, "CVE-1", now: NOW)
+                                    .dig(:affected, 0, :ecosystem_specific, :patches)
+
+    assert_equal [{ file: "Patches/x/fix.patch" }, { data: true }], patches
+  end
+
   def test_record_for_ecosystem_specific_lists_only_resolving_patches
     record = Brew::Vulns::OsvExport.record_for(nvi_formula, "CVE-2015-2305", now: NOW)
     eco = record[:affected].first[:ecosystem_specific]
