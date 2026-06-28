@@ -28,7 +28,7 @@ class TestOsvExport < Minitest::Test
     record = Brew::Vulns::OsvExport.record_for(nvi_formula, "CVE-2015-2305", now: NOW)
 
     assert_equal "1.7.3", record[:schema_version]
-    assert_equal "HOMEBREW-nvi-CVE-2015-2305", record[:id]
+    assert_equal "BREW-nvi-CVE-2015-2305", record[:id]
     assert_equal "2026-06-28T12:00:00Z", record[:modified]
     assert_equal ["CVE-2015-2305"], record[:upstream]
     refute record.key?(:summary)
@@ -131,9 +131,9 @@ class TestOsvExport < Minitest::Test
 
       filenames = written.map { |p| File.basename(p) }.sort
       expected = [
-        "HOMEBREW-libquicktime-CVE-2016-2399.json",
-        "HOMEBREW-libquicktime-CVE-2017-9122.json",
-        "HOMEBREW-nvi-CVE-2015-2305.json",
+        "BREW-libquicktime-CVE-2016-2399.json",
+        "BREW-libquicktime-CVE-2017-9122.json",
+        "BREW-nvi-CVE-2015-2305.json",
       ]
 
       assert_equal expected, filenames

@@ -21,7 +21,7 @@ module Brew
     module OsvExport
       SCHEMA_VERSION = "1.7.3"
       ECOSYSTEM = "Homebrew"
-      ID_PREFIX = "HOMEBREW"
+      ID_PREFIX = "BREW"
 
       module_function
 
