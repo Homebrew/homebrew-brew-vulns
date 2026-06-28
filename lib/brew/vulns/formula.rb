@@ -27,6 +27,7 @@ module Brew
           .flat_map { |p| Array(p["resolves"]) }
           .select { |r| r.is_a?(Hash) && r["type"] == "security" }
           .map { |r| r["id"].to_s.upcase }
+          .reject(&:empty?)
           .uniq
       end
 

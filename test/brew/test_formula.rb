@@ -176,6 +176,26 @@ class TestFormula < Minitest::Test
     assert_equal ["CVE-2016-2399", "CVE-2017-9122", "GHSA-XR7R-F8XQ-VFVV"], formula.resolved_vulnerability_ids
   end
 
+  def test_resolved_vulnerability_ids_skips_security_resolves_without_id
+    data = {
+      "name"    => "x",
+      "patches" => [
+        {
+          "resolves" => [
+            { "type" => "security" },
+            { "type" => "security", "id" => nil },
+            { "type" => "security", "id" => "" },
+            { "type" => "security", "id" => "CVE-2024-1234" },
+          ],
+        },
+      ],
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal ["CVE-2024-1234"], formula.resolved_vulnerability_ids
+  end
+
   def test_resolved_vulnerability_ids_ignores_defect_resolves
     data = {
       "name"    => "innoextract",
