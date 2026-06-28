@@ -1027,6 +1027,27 @@ class TestCLI < Minitest::Test
     assert sbom["vulnerabilities"].any? { |v| v["id"] == "CVE-2024-1234" }
   end
 
+  def test_cyclonedx_output_encodes_at_in_formula_name_purls
+    glibc_213 = Brew::Vulns::Formula.new(
+      "name"     => "glibc@2.13",
+      "versions" => { "stable" => "2.13" },
+      "urls"     => { "stable" => { "url" => "https://github.com/example/glibc/archive/refs/tags/v2.13.tar.gz" } },
+    )
+
+    stub_request(:post, "https://api.osv.dev/v1/querybatch")
+      .to_return(status: 200, body: { results: [{ vulns: [{ "id" => "CVE-2024-2961" }] }] }.to_json)
+    stub_request(:get, "https://api.osv.dev/v1/vulns/CVE-2024-2961")
+      .to_return(status: 200, body: { "id" => "CVE-2024-2961" }.to_json)
+
+    output = Brew::Vulns::Formula.stub :load_installed, [glibc_213] do
+      capture_stdout { Brew::Vulns::CLI.run(["--cyclonedx"]) }
+    end
+    sbom = JSON.parse(output)
+
+    assert_equal "pkg:brew/glibc%402.13@2.13", sbom["components"][0]["purl"]
+    assert_equal "pkg:brew/glibc%402.13@2.13", sbom["vulnerabilities"][0]["affects"][0]["ref"]
+  end
+
   def test_cyclonedx_output_includes_vulnerability_details
     formulae = [Brew::Vulns::Formula.new(@vim_data)]
 

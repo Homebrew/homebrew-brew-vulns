@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - Query OSV for formulae whose source is not on GitHub/GitLab/Codeberg by falling back to the formula's `head` git URL, a `tag:`-style stable git URL, or a forge URL in `homepage`, with the bare formula version. Removes the forge whitelist; any formula with a derivable git repository URL is now sent in the batch query
+- CycloneDX output: percent-encode `@` in `pkg:brew/` purls so versioned formula names like `glibc@2.13` are not misparsed as `name@version`
 
 ## [0.4.0] - 2026-06-28
 

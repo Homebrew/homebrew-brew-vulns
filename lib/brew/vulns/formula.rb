@@ -2,6 +2,7 @@
 
 require "json"
 require "open3"
+require "purl"
 
 module Brew
   module Vulns
@@ -17,6 +18,14 @@ module Brew
         @homepage = data["homepage"]
         @dependencies = data["dependencies"] || []
         @patches = data["patches"] || []
+      end
+
+      # Package URL for this formula. Uses the `purl` gem so that special
+      # characters in the formula name (notably `@` in versioned formulae like
+      # `glibc@2.13`) are percent-encoded; otherwise the `@` would be parsed as
+      # the version separator.
+      def purl(with_version: true)
+        Purl::PackageURL.new(type: "brew", name: name, version: with_version ? version : nil).to_s
       end
 
       # CVE/GHSA identifiers declared as resolved by this formula's patches.
