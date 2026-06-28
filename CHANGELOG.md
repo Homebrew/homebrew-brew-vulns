@@ -1,8 +1,11 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-28
+
 - Suppress vulnerabilities that a formula's patches declare as resolved (via `patches[].resolves` in `brew info --json=v2`, Homebrew 6.0.4+); list them separately in text/JSON output, exclude them from SARIF output, and exclude them from the exit code
 - CycloneDX output: emit patched vulnerabilities with `analysis.state = resolved` and include formula patches as `pedigree.patches` on each component
 - Add `--no-ignore-patches` to report patched vulnerabilities as open findings
+- Fix invalid SARIF output when no vulnerabilities are found (GitHub code scanning rejected the file)
 
 ## [0.3.0] - 2026-05-29
 
