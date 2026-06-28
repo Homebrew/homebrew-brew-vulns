@@ -95,6 +95,19 @@ class TestOsvExport < Minitest::Test
     assert_equal upstream["references"], record[:references]
   end
 
+  def test_record_for_encodes_at_in_formula_name_purl
+    formula = Brew::Vulns::Formula.new(
+      "name"     => "glibc@2.13",
+      "versions" => { "stable" => "2.13" },
+      "patches"  => [{ "resolves" => [{ "type" => "security", "id" => "CVE-2024-2961" }] }],
+    )
+
+    record = Brew::Vulns::OsvExport.record_for(formula, "CVE-2024-2961", now: NOW)
+
+    assert_equal "pkg:brew/glibc%402.13", record[:affected][0][:package][:purl]
+    assert_equal "glibc@2.13", record[:affected][0][:package][:name]
+  end
+
   def test_full_version_without_revision
     formula = Brew::Vulns::Formula.new("name" => "x", "versions" => { "stable" => "1.0" }, "revision" => 0)
 

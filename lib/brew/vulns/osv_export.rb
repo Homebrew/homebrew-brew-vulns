@@ -71,7 +71,7 @@ module Brew
           package: {
             ecosystem: ECOSYSTEM,
             name:      formula.name,
-            purl:      "pkg:brew/#{formula.name}",
+            purl:      formula.purl(with_version: false),
           },
           ranges: [
             {
