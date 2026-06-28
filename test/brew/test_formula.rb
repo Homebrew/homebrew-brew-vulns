@@ -140,6 +140,37 @@ class TestFormula < Minitest::Test
     assert_equal "v4.0.6", formula.tag
   end
 
+  def test_falls_back_to_forge_homepage_for_non_forge_tarball
+    data = {
+      "name" => "util-linux",
+      "homepage" => "https://github.com/util-linux/util-linux",
+      "versions" => { "stable" => "2.42.2" },
+      "urls" => {
+        "stable" => { "url" => "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_equal "https://github.com/util-linux/util-linux", formula.repo_url
+    assert_equal "2.42.2", formula.tag
+  end
+
+  def test_ignores_non_forge_homepage
+    data = {
+      "name" => "glib",
+      "homepage" => "https://docs.gtk.org/glib/",
+      "versions" => { "stable" => "2.88.2" },
+      "urls" => {
+        "stable" => { "url" => "https://download.gnome.org/sources/glib/2.88/glib-2.88.2.tar.xz" }
+      }
+    }
+
+    formula = Brew::Vulns::Formula.new(data)
+
+    assert_nil formula.repo_url
+  end
+
   def test_falls_back_to_head_url_and_version_for_non_forge_tarball
     data = {
       "name" => "coreutils",

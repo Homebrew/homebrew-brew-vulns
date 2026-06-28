@@ -6,7 +6,7 @@ require "open3"
 module Brew
   module Vulns
     class Formula
-      attr_reader :name, :version, :source_url, :head_url, :dependencies, :patches
+      attr_reader :name, :version, :source_url, :head_url, :homepage, :dependencies, :patches
 
       def initialize(data)
         @name = data["name"] || data["full_name"]
@@ -14,6 +14,7 @@ module Brew
         @source_url = data.dig("urls", "stable", "url")
         @stable_tag = data.dig("urls", "stable", "tag")
         @head_url = data.dig("urls", "head", "url")
+        @homepage = data["homepage"]
         @dependencies = data["dependencies"] || []
         @patches = data["patches"] || []
       end
@@ -69,18 +70,18 @@ module Brew
 
       # The git repository URL to use as the OSV `GIT` ecosystem package name.
       # In order of preference:
-      #   1. owner/repo extracted from a recognised forge URL on stable, then head.
-      #      Known forges are preferred even when head is a mirror of a non-forge
-      #      stable repo, because OSV's GIT coverage is much better for them.
+      #   1. owner/repo extracted from a recognised forge URL on stable, head,
+      #      or homepage. Known forges are preferred even over a canonical
+      #      non-forge git URL, because OSV's GIT coverage is much better there.
       #   2. the stable URL itself when stable is a git checkout (`url ..., tag: ...`)
       #   3. the head URL verbatim (head specs are always git URLs)
-      # Returns nil for formulae with no recognised forge URL, no `tag:` stable
-      # spec and no head spec.
+      # Returns nil when none of the above yield a URL.
       def repo_url
         return @repo_url if defined?(@repo_url)
 
         @repo_url = extract_repo_url(source_url) ||
                     extract_repo_url(head_url) ||
+                    extract_repo_url(homepage) ||
                     (source_url if @stable_tag) ||
                     head_url
       end
