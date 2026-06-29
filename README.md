@@ -91,11 +91,11 @@ brew vulns --help
 ## How it works
 
 1. Reads Homebrew formulae via `brew info --json=v2` (installed packages by default, or any named formulae passed as arguments)
-2. Extracts the repository URL and version tag from each formula's source URL
+2. Derives a git repository URL for each formula from its stable source URL, `head` URL or homepage, and a version from the release tag or formula version
 3. Queries the OSV API using the GIT ecosystem to find known vulnerabilities
 4. Reports any vulnerabilities found with their severity and CVE identifiers
 
-Packages with GitHub, GitLab, or Codeberg source URLs are checked. Packages from other sources are skipped.
+A formula is queried when a repository URL can be derived. GitHub, GitLab and Codeberg URLs are recognised in any of the stable, `head` or homepage fields; for other hosts, the `head` URL or a `tag:`-style stable git URL is used as-is. Formulae with none of these are skipped.
 
 ### Patched vulnerabilities
 
@@ -106,8 +106,8 @@ This relies on `patches[].resolves` data in `brew info --json=v2`, available fro
 ## Example output
 
 ```
-Checking 104 packages for vulnerabilities...
-(119 packages skipped - no supported source URL)
+Checking 181 packages for vulnerabilities...
+(42 packages skipped - no source repository URL or version)
 
 expat (2.7.3)
   CVE-2025-66382 (HIGH) - XML parsing vulnerability...

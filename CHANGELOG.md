@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Query OSV for formulae whose source is not on GitHub/GitLab/Codeberg by falling back to the formula's `head` git URL, a `tag:`-style stable git URL, or a forge URL in `homepage`, with the bare formula version. Removes the forge whitelist; any formula with a derivable git repository URL is now sent in the batch query
+
 ## [0.4.0] - 2026-06-28
 
 - Suppress vulnerabilities that a formula's patches declare as resolved (via `patches[].resolves` in `brew info --json=v2`, Homebrew 6.0.4+); list them separately in text/JSON output, exclude them from SARIF output, and exclude them from the exit code

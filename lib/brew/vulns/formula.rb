@@ -6,13 +6,15 @@ require "open3"
 module Brew
   module Vulns
     class Formula
-      attr_reader :name, :version, :source_url, :head_url, :dependencies, :patches
+      attr_reader :name, :version, :source_url, :head_url, :homepage, :dependencies, :patches
 
       def initialize(data)
         @name = data["name"] || data["full_name"]
         @version = data.dig("versions", "stable") || data["version"]
         @source_url = data.dig("urls", "stable", "url")
+        @stable_tag = data.dig("urls", "stable", "tag")
         @head_url = data.dig("urls", "head", "url")
+        @homepage = data["homepage"]
         @dependencies = data["dependencies"] || []
         @patches = data["patches"] || []
       end
@@ -66,32 +68,32 @@ module Brew
         { patches: cdx_patches }
       end
 
+      # The git repository URL to use as the OSV `GIT` ecosystem package name.
+      # In order of preference:
+      #   1. owner/repo extracted from a recognised forge URL on stable, head,
+      #      or homepage. Known forges are preferred even over a canonical
+      #      non-forge git URL, because OSV's GIT coverage is much better there.
+      #   2. the stable URL itself when stable is a git checkout (`url ..., tag: ...`)
+      #   3. the head URL verbatim (head specs are always git URLs)
+      # Returns nil when none of the above yield a URL.
       def repo_url
         return @repo_url if defined?(@repo_url)
 
-        @repo_url = extract_repo_url(source_url) || extract_repo_url(head_url)
+        @repo_url = extract_repo_url(source_url) ||
+                    extract_repo_url(head_url) ||
+                    extract_repo_url(homepage) ||
+                    (source_url if @stable_tag) ||
+                    head_url
       end
 
+      # The version identifier to send as the OSV query `version`. Prefers an
+      # explicit git tag (from a `tag:` stable spec or parsed from a forge
+      # tarball URL); falls back to the bare formula version, which OSV's GIT
+      # ecosystem accepts for at least some upstreams.
       def tag
         return @tag if defined?(@tag)
 
-        @tag = extract_tag_from_url(source_url)
-      end
-
-      def github?
-        repo_url&.include?("github.com")
-      end
-
-      def gitlab?
-        repo_url&.include?("gitlab.com")
-      end
-
-      def codeberg?
-        repo_url&.include?("codeberg.org")
-      end
-
-      def supported_forge?
-        github? || gitlab? || codeberg?
+        @tag = @stable_tag || extract_tag_from_url(source_url) || version
       end
 
       def to_osv_query
