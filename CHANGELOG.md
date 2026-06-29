@@ -3,6 +3,7 @@
 - Query OSV for formulae whose source is not on GitHub/GitLab/Codeberg by falling back to the formula's `head` git URL, a `tag:`-style stable git URL, or a forge URL in `homepage`, with the bare formula version. Removes the forge whitelist; any formula with a derivable git repository URL is now sent in the batch query
 - CycloneDX output: percent-encode `@` in `pkg:brew/` purls so versioned formula names like `glibc@2.13` are not misparsed as `name@version`
 - Add `--osv-export DIR` (experimental) to write OSV-schema records under a `Homebrew` ecosystem for every CVE listed in a formula's `patches[].resolves`. Each record marks the formula as fixed at the currently shipped version+revision and carries the resolving patch detail in `ecosystem_specific`. Intended as the seed for a published Homebrew advisory feed.
+- Retry the final OSV API attempt over IPv4 (via `Net::HTTP#ipaddr=`) when earlier attempts time out or fail to connect, to work around IPv6 paths that complete the TCP/TLS handshake but then drop data. Add `--ipv4` to force IPv4 from the first attempt.
 
 ## [0.4.0] - 2026-06-28
 

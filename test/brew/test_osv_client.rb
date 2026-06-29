@@ -8,6 +8,20 @@ class TestOsvClient < Minitest::Test
   def setup
     super
     @client = Brew::Vulns::OsvClient.new
+    stub_resolve_ipv4(@client)
+  end
+
+  # Replace resolve_ipv4 on `client` so retry tests don't perform real DNS
+  # lookups, and record each call so tests can assert on when the IPv4
+  # fallback is triggered. Also no-ops sleep so retry tests run instantly.
+  def stub_resolve_ipv4(client, returns: nil)
+    @resolve_calls = []
+    calls = @resolve_calls
+    client.define_singleton_method(:resolve_ipv4) do |host|
+      calls << host
+      returns
+    end
+    client.define_singleton_method(:sleep) { |_| }
   end
 
   def test_query_returns_vulnerabilities
@@ -198,5 +212,81 @@ class TestOsvClient < Minitest::Test
     vulns = @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
 
     assert_equal [], vulns
+  end
+
+  def test_resolve_ipv4_returns_first_a_record
+    client = Brew::Vulns::OsvClient.new
+    addr = Addrinfo.ip("93.184.216.34")
+
+    Addrinfo.stub :getaddrinfo, [addr] do
+      assert_equal "93.184.216.34", client.resolve_ipv4("api.osv.dev")
+    end
+  end
+
+  def test_resolve_ipv4_returns_nil_on_dns_failure
+    client = Brew::Vulns::OsvClient.new
+
+    Addrinfo.stub :getaddrinfo, ->(*) { raise SocketError, "getaddrinfo: nodename nor servname provided" } do
+      assert_nil client.resolve_ipv4("api.osv.dev")
+    end
+  end
+
+  def test_force_ipv4_resolves_before_first_request
+    client = Brew::Vulns::OsvClient.new(force_ipv4: true)
+    stub_resolve_ipv4(client, returns: "93.184.216.34")
+
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal ["api.osv.dev"], @resolve_calls
+  end
+
+  def test_timeout_forces_ipv4_on_final_retry
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_timeout.then
+      .to_timeout.then
+      .to_return(status: 200, body: { vulns: [{ id: "CVE-2024-1234" }] }.to_json)
+
+    vulns = @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal 1, vulns.size
+    assert_equal ["api.osv.dev"], @resolve_calls
+  end
+
+  def test_single_timeout_does_not_force_ipv4
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_timeout.then
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_empty @resolve_calls
+  end
+
+  def test_connection_error_forces_ipv4_on_final_retry
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_raise(Errno::ECONNREFUSED).then
+      .to_raise(Errno::ECONNREFUSED).then
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    @client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal ["api.osv.dev"], @resolve_calls
+  end
+
+  def test_force_ipv4_does_not_re_resolve_on_retry
+    client = Brew::Vulns::OsvClient.new(force_ipv4: true)
+    stub_resolve_ipv4(client, returns: "93.184.216.34")
+
+    stub_request(:post, "https://api.osv.dev/v1/query")
+      .to_timeout.then
+      .to_timeout.then
+      .to_return(status: 200, body: { vulns: [] }.to_json)
+
+    client.query(repo_url: "https://github.com/test/repo", version: "v1.0.0")
+
+    assert_equal ["api.osv.dev"], @resolve_calls
   end
 end

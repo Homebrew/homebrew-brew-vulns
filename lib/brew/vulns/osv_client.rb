@@ -3,6 +3,7 @@
 require "net/http"
 require "json"
 require "uri"
+require "socket"
 require "brew/vulns/version"
 
 module Brew
@@ -19,6 +20,10 @@ module Brew
       class ApiError < Error; end
 
       USER_AGENT = "brew-vulns/#{Brew::Vulns::VERSION} (+https://github.com/Homebrew/homebrew-brew-vulns)"
+
+      def initialize(force_ipv4: false)
+        @force_ipv4 = force_ipv4
+      end
 
       def query(repo_url:, version:)
         payload = {
@@ -86,6 +91,7 @@ module Brew
 
       def execute_request(uri, request)
         attempts = 0
+        ipv4_addr = resolve_ipv4(uri.host) if @force_ipv4
 
         begin
           attempts += 1
@@ -94,6 +100,7 @@ module Brew
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER
           http.open_timeout = OPEN_TIMEOUT
           http.read_timeout = READ_TIMEOUT
+          http.ipaddr = ipv4_addr if ipv4_addr
 
           response = http.request(request)
 
@@ -107,12 +114,14 @@ module Brew
           raise ApiError, "Invalid JSON response from OSV API: #{e.message}"
         rescue Net::OpenTimeout, Net::ReadTimeout => e
           if attempts < MAX_RETRIES
+            ipv4_addr ||= resolve_ipv4(uri.host) if attempts == MAX_RETRIES - 1
             sleep RETRY_DELAY
             retry
           end
           raise ApiError, "OSV API timeout after #{attempts} attempts: #{e.message}"
         rescue SocketError, Errno::ECONNREFUSED => e
           if attempts < MAX_RETRIES
+            ipv4_addr ||= resolve_ipv4(uri.host) if attempts == MAX_RETRIES - 1
             sleep RETRY_DELAY
             retry
           end
@@ -120,6 +129,15 @@ module Brew
         rescue OpenSSL::SSL::SSLError => e
           raise ApiError, "OSV API SSL error: #{e.message}"
         end
+      end
+
+      # Resolve the first IPv4 address for `host`, for use with Net::HTTP#ipaddr=
+      # to bypass a misbehaving IPv6 path. Returns nil (so the caller falls back
+      # to default resolution) if no A record is found or DNS fails.
+      def resolve_ipv4(host)
+        Addrinfo.getaddrinfo(host, nil, Socket::AF_INET, Socket::SOCK_STREAM).first&.ip_address
+      rescue SocketError
+        nil
       end
 
       MAX_PAGES = 100

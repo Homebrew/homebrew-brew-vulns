@@ -29,6 +29,7 @@ module Brew
         @min_severity = parse_severity(args)
         @brewfile = parse_brewfile_path(args)
         @osv_export_dir = parse_osv_export_dir(args)
+        @force_ipv4 = args.include?("--ipv4")
       end
 
       def parse_formula_names(args)
@@ -178,7 +179,7 @@ module Brew
       end
 
       def scan_vulnerabilities(formulae)
-        client = OsvClient.new
+        client = OsvClient.new(force_ipv4: @force_ipv4)
         queries = formulae.map(&:to_osv_query).compact
 
         vuln_results = client.query_batch(queries)
@@ -469,6 +470,7 @@ module Brew
             --osv-export DIR     Write OSV-schema records for patch-resolved CVEs to DIR (experimental)
             -m, --max-summary N  Truncate summaries to N characters (default: 60, 0 for no limit)
             -s, --severity LEVEL Only show vulnerabilities at or above LEVEL (low, medium, high, critical)
+            --ipv4               Connect to api.osv.dev over IPv4 only
             -h, --help           Show this help message
 
           Examples:
