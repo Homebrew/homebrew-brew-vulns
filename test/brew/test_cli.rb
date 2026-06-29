@@ -144,6 +144,42 @@ class TestCLI < Minitest::Test
     end
   end
 
+  def test_osv_export_flag_runs_over_all_formulae_by_default
+    libqt = Brew::Vulns::Formula.new(@libquicktime_data)
+    vim = Brew::Vulns::Formula.new(@vim_data)
+
+    export_args = nil
+    Brew::Vulns::Formula.stub :load_all, [libqt, vim] do
+      Brew::Vulns::OsvExport.stub :run, ->(formulae, dir, **) { export_args = [formulae, dir]; [] } do
+        result = Brew::Vulns::CLI.run(["--osv-export", "/tmp/out"])
+
+        assert_equal 0, result
+      end
+    end
+
+    refute_nil export_args
+    assert_equal [libqt], export_args[0]
+    assert_equal "/tmp/out", export_args[1]
+  end
+
+  def test_osv_export_flag_with_named_formulae
+    libqt = Brew::Vulns::Formula.new(@libquicktime_data)
+
+    Brew::Vulns::Formula.stub :load_named, ->(names, **) { assert_equal ["libquicktime"], names; [libqt] } do
+      Brew::Vulns::OsvExport.stub :run, ->(*) { [] } do
+        result = Brew::Vulns::CLI.run(["--osv-export=/tmp/out", "libquicktime"])
+
+        assert_equal 0, result
+      end
+    end
+  end
+
+  def test_osv_export_flag_requires_dir
+    assert_equal 2, Brew::Vulns::CLI.run(["--osv-export"])
+    assert_equal 2, Brew::Vulns::CLI.run(["--osv-export="])
+    assert_equal 2, Brew::Vulns::CLI.run(["--osv-export", "--json"])
+  end
+
   def test_load_error_returns_two
     Brew::Vulns::Formula.stub :load_installed, ->(*) { raise Brew::Vulns::Error, "boom" } do
       result = Brew::Vulns::CLI.run([])
