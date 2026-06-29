@@ -144,6 +144,35 @@ class TestCLI < Minitest::Test
     end
   end
 
+  def test_ipv4_flag_passes_force_ipv4_to_client
+    captured = nil
+    fake_client = Object.new
+    fake_client.define_singleton_method(:query_batch) { |_| [] }
+
+    Brew::Vulns::Formula.stub :load_installed, [Brew::Vulns::Formula.new(@vim_data)] do
+      Brew::Vulns::OsvClient.stub :new, ->(**opts) { captured = opts; fake_client } do
+        result = Brew::Vulns::CLI.run(["--ipv4"])
+        assert_equal 0, result
+      end
+    end
+
+    assert_equal({ force_ipv4: true }, captured)
+  end
+
+  def test_no_ipv4_flag_passes_force_ipv4_false
+    captured = nil
+    fake_client = Object.new
+    fake_client.define_singleton_method(:query_batch) { |_| [] }
+
+    Brew::Vulns::Formula.stub :load_installed, [Brew::Vulns::Formula.new(@vim_data)] do
+      Brew::Vulns::OsvClient.stub :new, ->(**opts) { captured = opts; fake_client } do
+        Brew::Vulns::CLI.run([])
+      end
+    end
+
+    assert_equal({ force_ipv4: false }, captured)
+  end
+
   def test_osv_export_flag_runs_over_all_formulae_by_default
     libqt = Brew::Vulns::Formula.new(@libquicktime_data)
     vim = Brew::Vulns::Formula.new(@vim_data)
