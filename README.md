@@ -197,7 +197,7 @@ See [examples/](examples/) for workflows that check changed formulae on tap pull
 
 ```bash
 git clone https://github.com/Homebrew/homebrew-brew-vulns
-cd brew-vulns
+cd homebrew-brew-vulns
 bin/setup
 rake test
 ```
