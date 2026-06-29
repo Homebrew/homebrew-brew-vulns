@@ -213,7 +213,7 @@ module Brew
             type:    "library",
             name:    formula.name,
             version: formula.version,
-            purl:    "pkg:brew/#{formula.name}@#{formula.version}",
+            purl:    formula.purl,
           }
           pedigree = formula.cyclonedx_pedigree
           component[:pedigree] = pedigree if pedigree
@@ -255,7 +255,7 @@ module Brew
           source:      { name: "OSV", url: "https://osv.dev" },
           ratings:     [{ severity: vuln.severity_display&.downcase }],
           description: vuln.summary,
-          affects:     [{ ref: "pkg:brew/#{formula.name}@#{formula.version}" }],
+          affects:     [{ ref: formula.purl }],
         }
       end
 

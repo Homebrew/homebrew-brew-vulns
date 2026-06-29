@@ -221,6 +221,19 @@ class TestFormula < Minitest::Test
     assert_nil formula.to_osv_query
   end
 
+  def test_purl_encodes_at_in_versioned_formula_names
+    formula = Brew::Vulns::Formula.new("name" => "glibc@2.13", "versions" => { "stable" => "2.13_1" })
+
+    assert_equal "pkg:brew/glibc%402.13@2.13_1", formula.purl
+    assert_equal "pkg:brew/glibc%402.13", formula.purl(with_version: false)
+  end
+
+  def test_purl_for_plain_formula_name
+    formula = Brew::Vulns::Formula.new("name" => "vim", "versions" => { "stable" => "9.1.0" })
+
+    assert_equal "pkg:brew/vim@9.1.0", formula.purl
+  end
+
   def test_resolved_vulnerability_ids_extracts_security_ids_across_patches
     data = {
       "name"    => "libquicktime",
