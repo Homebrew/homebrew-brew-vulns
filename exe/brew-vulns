@@ -3,4 +3,6 @@
 
 require "brew/vulns"
 
+warn Brew::Vulns::DEPRECATION_MESSAGE
+
 exit Brew::Vulns::CLI.run(ARGV)
