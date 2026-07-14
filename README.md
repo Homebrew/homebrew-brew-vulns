@@ -1,7 +1,7 @@
 # brew-vulns
 
 > [!WARNING]
-> **Deprecated.** `brew vulns` is now a built-in Homebrew command as of Homebrew X.Y.Z. Run `brew update` and use `brew vulns` directly; this tap and gem are no longer needed and will be archived. See [Homebrew/brew#23080](https://github.com/Homebrew/brew/pull/23080).
+> **Deprecated.** `brew vulns` is now a built-in Homebrew command as of Homebrew 6.0.11. Run `brew update` and use `brew vulns` directly; this tap and gem are no longer needed and will be archived. See [Homebrew/brew#23080](https://github.com/Homebrew/brew/pull/23080).
 >
 > Interface changes in the built-in command:
 >

@@ -5,7 +5,7 @@ class BrewVulns < Formula
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
 
-  deprecate! date: "2026-07-13", because: "is now built into Homebrew as `brew vulns`"
+  deprecate! date: "2026-07-14", because: "is now built into Homebrew as `brew vulns`"
 
   depends_on "ruby"
 
