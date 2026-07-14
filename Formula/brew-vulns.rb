@@ -2,7 +2,7 @@ class BrewVulns < Formula
   desc "Check Homebrew packages for known vulnerabilities via osv.dev"
   homepage "https://github.com/Homebrew/homebrew-brew-vulns"
   url "https://github.com/Homebrew/homebrew-brew-vulns/archive/refs/tags/v0.5.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "f20b9dadb01d3ec8c4e97fe5e3225aac58ca609f935ce17928b23deabd415ba7"
   license "MIT"
 
   deprecate! date: "2026-07-14", because: "is now built into Homebrew as `brew vulns`"
