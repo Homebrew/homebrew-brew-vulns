@@ -5,7 +5,7 @@
 >
 > Interface changes in the built-in command:
 >
-> - `--all` is now `--eval-all` (or set `HOMEBREW_EVAL_ALL=1`)
+> - `--all` is dropped; with no arguments the built-in command scans every trusted formula (or just installed formulae if tap trust is disabled)
 > - `-b` short flag is dropped; use `--brewfile`
 > - `--sarif`, `--cyclonedx`, `--osv-export` and `--ipv4` are not available (SARIF and CycloneDX are planned as follow-ups)
 > - Errors no longer exit with code `2`; brew's standard error handling applies. Exit `0` (clean) and `1` (vulnerabilities found) are unchanged.
