@@ -1,5 +1,18 @@
 # brew-vulns
 
+> [!WARNING]
+> **Deprecated.** `brew vulns` is now a built-in Homebrew command as of Homebrew 6.0.11. Run `brew update` and use `brew vulns` directly; this tap and gem are no longer needed and will be archived. See [Homebrew/brew#23080](https://github.com/Homebrew/brew/pull/23080).
+>
+> Interface changes in the built-in command:
+>
+> - `--all` is dropped; with no arguments the built-in command scans every trusted formula (or just installed formulae if tap trust is disabled)
+> - `-b` short flag is dropped; use `--brewfile`
+> - `--sarif`, `--cyclonedx` and `--ipv4` are not available (SARIF and CycloneDX are planned as follow-ups)
+> - `--osv-export` moved to `brew generate-vulns-advisories` ([Homebrew/brew#23106](https://github.com/Homebrew/brew/pull/23106)); its output lives at [Homebrew/advisory-database](https://github.com/Homebrew/advisory-database)
+> - Errors no longer exit with code `2`; brew's standard error handling applies. Exit `0` (clean) and `1` (vulnerabilities found) are unchanged.
+>
+> To migrate: `brew uninstall brew-vulns && brew untap homebrew/brew-vulns` (or `gem uninstall brew-vulns`).
+
 A Homebrew subcommand that checks installed packages for known vulnerabilities using the [OSV.dev](https://osv.dev) database.
 
 ## Installation
