@@ -1,8 +1,0 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
-require "brew/vulns"
-
-warn Brew::Vulns::DEPRECATION_MESSAGE
-
-exit Brew::Vulns::CLI.run(ARGV)
